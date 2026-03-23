@@ -59,8 +59,12 @@ public class SnakeController : MonoBehaviour
         if (input.sqrMagnitude > 0.01f)
         {
             var targetDirection = input.normalized;
-            var maxRadiansDelta = turnSpeedDegreesPerSecond * Mathf.Deg2Rad * Time.fixedDeltaTime;
-            currentDirection = Vector2.RotateTowards(currentDirection, targetDirection, maxRadiansDelta, 0f).normalized;
+            var maxDegreesDelta = turnSpeedDegreesPerSecond * Time.fixedDeltaTime;
+            var currentAngle = Mathf.Atan2(currentDirection.y, currentDirection.x) * Mathf.Rad2Deg;
+            var targetAngle = Mathf.Atan2(targetDirection.y, targetDirection.x) * Mathf.Rad2Deg;
+            var nextAngle = Mathf.MoveTowardsAngle(currentAngle, targetAngle, maxDegreesDelta);
+            var nextAngleRadians = nextAngle * Mathf.Deg2Rad;
+            currentDirection = new Vector2(Mathf.Cos(nextAngleRadians), Mathf.Sin(nextAngleRadians)).normalized;
         }
 
         rb.velocity = currentDirection * moveSpeed;
