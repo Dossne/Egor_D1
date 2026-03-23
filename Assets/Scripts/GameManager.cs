@@ -6,11 +6,17 @@ using UnityEngine.UI;
 
 public class GameManager : MonoBehaviour
 {
+    [System.Serializable]
+    private class LevelConfig
+    {
+        public List<Vector2> berryPositions = new();
+    }
+
     [Header("Game Rules")]
     [SerializeField] private int startSnakeLength = 5;
-    [SerializeField] private int berryCount = 3;
     [SerializeField] private int growthPerBerry = 3;
     [SerializeField] private float snakeSpeed = 2.625f;
+    [SerializeField] private List<LevelConfig> levels = new();
 
     [Header("Arena")]
     [SerializeField] private Vector2 arenaSize = new(8f, 12f);
@@ -19,14 +25,16 @@ public class GameManager : MonoBehaviour
     [SerializeField] private float minimumCameraSize = 4.5f;
     [SerializeField] private Vector3 cameraOffset = new(0f, 0f, -10f);
 
-    private readonly List<Vector2> initialBerryPositions = new();
     private readonly List<Berry> activeBerries = new();
     private readonly List<GameObject> activeJuiceDroplets = new();
 
     private SnakeController snakeController;
     private JoystickInput joystickInput;
-    private Text winText;
+    private Text levelText;
+    private GameObject levelCompleteMenu;
+    private Text levelCompleteText;
     private Camera mainCamera;
+    private int currentLevelIndex;
     private bool levelFinished;
 
     private void Awake()
@@ -36,8 +44,10 @@ public class GameManager : MonoBehaviour
         SetupCamera();
         SetupUi();
         BuildArena();
+        EnsureLevelsConfigured();
         CreateSnake();
-        CreateOrRestoreBerries(useStoredPositions: false);
+        SpawnCurrentLevelBerries();
+        UpdateLevelText();
     }
 
     private void LateUpdate()
@@ -130,20 +140,31 @@ public class GameManager : MonoBehaviour
         joystickInput = joystickArea.GetComponent<JoystickInput>();
         joystickInput.SetReferences(joystickRect, handleRect);
 
-        var winObject = new GameObject("WinText", typeof(RectTransform), typeof(Text));
-        winObject.transform.SetParent(canvasObject.transform, false);
-        var winRect = winObject.GetComponent<RectTransform>();
-        winRect.anchorMin = new Vector2(0.5f, 0.5f);
-        winRect.anchorMax = new Vector2(0.5f, 0.5f);
-        winRect.anchoredPosition = new Vector2(0f, 280f);
-        winRect.sizeDelta = new Vector2(600f, 180f);
+        levelText = CreateText(canvasObject.transform, "LevelText", new Vector2(20f, -20f), new Vector2(420f, 96f), TextAnchor.UpperLeft, 48);
+        levelText.color = new Color(1f, 0.95f, 0.2f);
 
-        winText = winObject.GetComponent<Text>();
-        winText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        winText.fontSize = 84;
-        winText.alignment = TextAnchor.MiddleCenter;
-        winText.color = new Color(1f, 0.95f, 0.2f);
-        winText.text = string.Empty;
+        levelCompleteMenu = new GameObject("LevelCompleteMenu", typeof(RectTransform), typeof(Image));
+        levelCompleteMenu.transform.SetParent(canvasObject.transform, false);
+        var menuRect = levelCompleteMenu.GetComponent<RectTransform>();
+        menuRect.anchorMin = new Vector2(0.5f, 0.5f);
+        menuRect.anchorMax = new Vector2(0.5f, 0.5f);
+        menuRect.pivot = new Vector2(0.5f, 0.5f);
+        menuRect.sizeDelta = new Vector2(700f, 420f);
+        var menuBackground = levelCompleteMenu.GetComponent<Image>();
+        menuBackground.color = new Color(0.05f, 0.08f, 0.11f, 0.92f);
+
+        levelCompleteText = CreateText(levelCompleteMenu.transform, "LevelCompleteText", new Vector2(0f, 130f), new Vector2(640f, 120f), TextAnchor.MiddleCenter, 72);
+        var levelCompleteRect = levelCompleteText.GetComponent<RectTransform>();
+        levelCompleteRect.anchorMin = new Vector2(0.5f, 0.5f);
+        levelCompleteRect.anchorMax = new Vector2(0.5f, 0.5f);
+        levelCompleteRect.pivot = new Vector2(0.5f, 0.5f);
+        levelCompleteRect.anchoredPosition = new Vector2(0f, 130f);
+        levelCompleteText.color = new Color(1f, 0.95f, 0.2f);
+        levelCompleteText.text = "level complete";
+
+        CreateMenuButton(levelCompleteMenu.transform, "NextLevelButton", "next level", new Vector2(0f, 10f), HandleNextLevelPressed);
+        CreateMenuButton(levelCompleteMenu.transform, "RetryButton", "retry", new Vector2(0f, -120f), HandleRetryPressed);
+        levelCompleteMenu.SetActive(false);
     }
 
     private void BuildArena()
@@ -189,7 +210,7 @@ public class GameManager : MonoBehaviour
         if (activeBerries.Count == 0)
         {
             levelFinished = true;
-            winText.text = "you win";
+            levelCompleteMenu.SetActive(true);
             Time.timeScale = 0f;
         }
     }
@@ -224,14 +245,17 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        RestartLevel();
+        RestartCurrentLevel(clearSplashes: true);
     }
 
-    private void RestartLevel()
+    private void RestartCurrentLevel(bool clearSplashes)
     {
         Time.timeScale = 1f;
         levelFinished = false;
-        winText.text = string.Empty;
+        if (levelCompleteMenu != null)
+        {
+            levelCompleteMenu.SetActive(false);
+        }
 
         if (snakeController != null)
         {
@@ -247,34 +271,28 @@ public class GameManager : MonoBehaviour
         }
 
         activeBerries.Clear();
-        ClearJuiceDroplets();
-
-        CreateSnake();
-        CreateOrRestoreBerries(useStoredPositions: true);
-    }
-
-    private void CreateOrRestoreBerries(bool useStoredPositions)
-    {
-        if (!useStoredPositions)
+        if (clearSplashes)
         {
-            initialBerryPositions.Clear();
+            ClearJuiceDroplets();
         }
 
-        for (var i = 0; i < berryCount; i++)
-        {
-            Vector2 spawnPosition;
-            if (useStoredPositions && i < initialBerryPositions.Count)
-            {
-                spawnPosition = initialBerryPositions[i];
-            }
-            else
-            {
-                spawnPosition = GetBerrySpawnPosition();
-                initialBerryPositions.Add(spawnPosition);
-            }
+        CreateSnake();
+        SpawnCurrentLevelBerries();
+        UpdateLevelText();
+    }
 
+    private void SpawnCurrentLevelBerries()
+    {
+        if (levels.Count == 0)
+        {
+            return;
+        }
+
+        var level = levels[Mathf.Clamp(currentLevelIndex, 0, levels.Count - 1)];
+        for (var i = 0; i < level.berryPositions.Count; i++)
+        {
             var berryObject = new GameObject($"Berry_{i + 1}", typeof(SpriteRenderer), typeof(CircleCollider2D), typeof(Berry));
-            berryObject.transform.position = spawnPosition;
+            berryObject.transform.position = level.berryPositions[i];
 
             var berry = berryObject.GetComponent<Berry>();
             berry.Setup(this, growthPerBerry);
@@ -282,33 +300,43 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    private Vector2 GetBerrySpawnPosition()
+    private void EnsureLevelsConfigured()
     {
-        const int maxAttempts = 50;
-        for (var attempt = 0; attempt < maxAttempts; attempt++)
+        if (levels.Count > 0)
         {
-            var margin = 1f;
-            var x = Random.Range(-arenaSize.x * 0.5f + margin, arenaSize.x * 0.5f - margin);
-            var y = Random.Range(-arenaSize.y * 0.5f + margin, arenaSize.y * 0.5f - margin);
-            var position = new Vector2(x, y);
-
-            var overlapFound = false;
-            for (var i = 0; i < initialBerryPositions.Count; i++)
-            {
-                if (Vector2.Distance(initialBerryPositions[i], position) < 1.2f)
-                {
-                    overlapFound = true;
-                    break;
-                }
-            }
-
-            if (!overlapFound)
-            {
-                return position;
-            }
+            return;
         }
 
-        return Vector2.zero;
+        levels = new List<LevelConfig>
+        {
+            new() { berryPositions = new List<Vector2> { new(-2.6f, -2.2f), new(0.3f, 1.6f), new(2.3f, 3.1f) } },
+            new() { berryPositions = new List<Vector2> { new(-2.2f, 2.8f), new(2.2f, 2.2f), new(0f, -1.9f), new(1.5f, -3.4f) } },
+            new() { berryPositions = new List<Vector2> { new(-2.7f, 0.5f), new(-0.2f, 3f), new(2.5f, 0.8f), new(-1.4f, -2.9f), new(1.6f, -3.2f) } }
+        };
+    }
+
+    private void HandleNextLevelPressed()
+    {
+        if (levels.Count == 0)
+        {
+            return;
+        }
+
+        currentLevelIndex = (currentLevelIndex + 1) % levels.Count;
+        RestartCurrentLevel(clearSplashes: false);
+    }
+
+    private void HandleRetryPressed()
+    {
+        RestartCurrentLevel(clearSplashes: false);
+    }
+
+    private void UpdateLevelText()
+    {
+        if (levelText != null)
+        {
+            levelText.text = $"level {currentLevelIndex + 1}";
+        }
     }
 
     private static void CreateWall(string name, Vector2 position, Vector2 size)
@@ -366,8 +394,6 @@ public class GameManager : MonoBehaviour
         if (droplet != null)
         {
             dropletTransform.position = targetPosition;
-            activeJuiceDroplets.Remove(droplet);
-            Destroy(droplet);
         }
     }
 
@@ -416,6 +442,53 @@ public class GameManager : MonoBehaviour
         renderer.sprite = RuntimeSpriteFactory.WhiteSprite;
         renderer.color = new Color(0.11f, 0.16f, 0.13f, 1f);
         renderer.sortingOrder = -1;
+    }
+
+    private static Text CreateText(Transform parent, string objectName, Vector2 anchoredPosition, Vector2 size, TextAnchor alignment, int fontSize)
+    {
+        var textObject = new GameObject(objectName, typeof(RectTransform), typeof(Text));
+        textObject.transform.SetParent(parent, false);
+        var textRect = textObject.GetComponent<RectTransform>();
+        textRect.anchorMin = new Vector2(0f, 1f);
+        textRect.anchorMax = new Vector2(0f, 1f);
+        textRect.pivot = new Vector2(0f, 1f);
+        textRect.anchoredPosition = anchoredPosition;
+        textRect.sizeDelta = size;
+
+        var text = textObject.GetComponent<Text>();
+        text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        text.fontSize = fontSize;
+        text.alignment = alignment;
+        text.text = string.Empty;
+        return text;
+    }
+
+    private static void CreateMenuButton(Transform parent, string name, string label, Vector2 anchoredPosition, UnityEngine.Events.UnityAction callback)
+    {
+        var buttonObject = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
+        buttonObject.transform.SetParent(parent, false);
+
+        var buttonRect = buttonObject.GetComponent<RectTransform>();
+        buttonRect.anchorMin = new Vector2(0.5f, 0.5f);
+        buttonRect.anchorMax = new Vector2(0.5f, 0.5f);
+        buttonRect.pivot = new Vector2(0.5f, 0.5f);
+        buttonRect.anchoredPosition = anchoredPosition;
+        buttonRect.sizeDelta = new Vector2(420f, 92f);
+
+        var buttonImage = buttonObject.GetComponent<Image>();
+        buttonImage.color = new Color(0.2f, 0.45f, 0.24f, 0.95f);
+
+        var button = buttonObject.GetComponent<Button>();
+        button.onClick.AddListener(callback);
+
+        var text = CreateText(buttonObject.transform, "Label", new Vector2(0f, 0f), new Vector2(420f, 92f), TextAnchor.MiddleCenter, 44);
+        var textRect = text.GetComponent<RectTransform>();
+        textRect.anchorMin = new Vector2(0.5f, 0.5f);
+        textRect.anchorMax = new Vector2(0.5f, 0.5f);
+        textRect.pivot = new Vector2(0.5f, 0.5f);
+        textRect.anchoredPosition = Vector2.zero;
+        text.color = Color.white;
+        text.text = label;
     }
 
 }
