@@ -29,6 +29,7 @@ public class Berry : MonoBehaviour
             return;
         }
 
+        gameManager.PlayBerryEatSound();
         snake.Grow(growthAmount);
         snake.PlayEatAnimation();
         gameManager.SpawnBerryJuiceSplash(transform.position);

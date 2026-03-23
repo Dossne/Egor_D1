@@ -354,7 +354,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   startSnakeLength: 5
   growthPerBerry: 3
-  snakeSpeed: 3
+  snakeSpeed: 2.55
   snakeSpeedFactor: 1
   snakeSpeedBoostFactor: 1.25
   levelTimerDurationSeconds: 60
