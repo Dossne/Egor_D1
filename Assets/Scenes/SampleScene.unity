@@ -354,11 +354,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   startSnakeLength: 5
   growthPerBerry: 3
-  snakeSpeed: 3.5
+  snakeSpeed: 3
   snakeSpeedFactor: 1
   snakeSpeedBoostFactor: 1.25
   levelTimerDurationSeconds: 60
   deathMenuDelaySeconds: 1
+  failedMenuVerticalOffset: 64
   levels: []
   baseArenaSize: {x: 8, y: 12}
   nextLevelSizeMultiplierRange: {x: 1.5, y: 2}
