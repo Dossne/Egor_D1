@@ -105,7 +105,7 @@ public class GameManager : MonoBehaviour
         winRect.sizeDelta = new Vector2(600f, 180f);
 
         winText = winObject.GetComponent<Text>();
-        winText.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+        winText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         winText.fontSize = 84;
         winText.alignment = TextAnchor.MiddleCenter;
         winText.color = new Color(1f, 0.95f, 0.2f);
