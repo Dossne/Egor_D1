@@ -311,3 +311,7 @@ MonoBehaviour:
   snakeSpeed: 3.5
   arenaSize: {x: 8, y: 12}
   wallThickness: 0.4
+  uiFont: {fileID: 0}
+  uiPopupSprite: {fileID: 0}
+  uiButtonSprite: {fileID: 0}
+  uiJoystickSprite: {fileID: 0}
