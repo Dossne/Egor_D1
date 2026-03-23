@@ -10,6 +10,7 @@ public static class RuntimeSpriteFactory
     private static Sprite snakeBodySprite;
     private static Sprite berrySprite;
     private static Sprite wallSprite;
+    private static Sprite mineBodySprite;
 
     public static Sprite WhiteSprite
     {
@@ -115,6 +116,19 @@ public static class RuntimeSpriteFactory
             }
 
             return wallSprite;
+        }
+    }
+
+    public static Sprite MineBodySprite
+    {
+        get
+        {
+            if (mineBodySprite == null)
+            {
+                mineBodySprite = CreateMineBodySprite(128);
+            }
+
+            return mineBodySprite;
         }
     }
 
@@ -341,6 +355,43 @@ public static class RuntimeSpriteFactory
 
         texture.Apply();
         return Sprite.Create(texture, new Rect(0, 0, width, height), new Vector2(0.5f, 0.5f), height);
+    }
+
+    private static Sprite CreateMineBodySprite(int size)
+    {
+        var texture = CreateTransparentTexture(size, size);
+        var center = new Vector2((size - 1) * 0.5f, (size - 1) * 0.5f);
+        var radius = size * 0.44f;
+        var border = size * 0.06f;
+
+        for (var y = 0; y < size; y++)
+        {
+            for (var x = 0; x < size; x++)
+            {
+                var point = new Vector2(x, y);
+                var distance = Vector2.Distance(point, center);
+                if (distance > radius)
+                {
+                    continue;
+                }
+
+                var color = distance >= radius - border
+                    ? new Color(0.2f, 0.2f, 0.24f, 1f)
+                    : new Color(0.12f, 0.12f, 0.15f, 1f);
+
+                if (x < center.x - size * 0.06f && y > center.y + size * 0.02f)
+                {
+                    color = Color.Lerp(color, new Color(0.45f, 0.45f, 0.5f, 1f), 0.32f);
+                }
+
+                texture.SetPixel(x, y, color);
+            }
+        }
+
+        PaintCircle(texture, new Vector2(size * 0.5f, size * 0.5f), size * 0.12f, new Color(0.7f, 0.08f, 0.08f, 1f));
+        PaintCircle(texture, new Vector2(size * 0.47f, size * 0.54f), size * 0.03f, new Color(1f, 0.55f, 0.4f, 1f));
+        texture.Apply();
+        return Sprite.Create(texture, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
     }
 
     private static Texture2D CreateTransparentTexture(int width, int height)
