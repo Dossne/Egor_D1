@@ -292,17 +292,17 @@ public class GameManager : MonoBehaviour
         wall.transform.localScale = new Vector3(size.x, size.y, 1f);
 
         var renderer = wall.GetComponent<SpriteRenderer>();
-        renderer.sprite = RuntimeSpriteFactory.WhiteSprite;
-        renderer.color = new Color(1f, 0.24f, 0.19f, 1f);
+        renderer.sprite = RuntimeSpriteFactory.WallSprite;
+        renderer.color = Color.white;
         renderer.sortingOrder = 3;
 
         var glow = new GameObject("Glow", typeof(SpriteRenderer));
         glow.transform.SetParent(wall.transform, false);
-        glow.transform.localScale = new Vector3(1.35f, 2.8f, 1f);
+        glow.transform.localScale = new Vector3(1.15f, 3.1f, 1f);
 
         var glowRenderer = glow.GetComponent<SpriteRenderer>();
-        glowRenderer.sprite = RuntimeSpriteFactory.WhiteSprite;
-        glowRenderer.color = new Color(1f, 0.09f, 0.09f, 0.38f);
+        glowRenderer.sprite = RuntimeSpriteFactory.WallSprite;
+        glowRenderer.color = new Color(1f, 0.12f, 0.12f, 0.42f);
         glowRenderer.sortingOrder = 2;
 
         var collider = wall.GetComponent<BoxCollider2D>();
@@ -318,7 +318,7 @@ public class GameManager : MonoBehaviour
 
         var renderer = corner.GetComponent<SpriteRenderer>();
         renderer.sprite = RuntimeSpriteFactory.CircleSprite;
-        renderer.color = new Color(1f, 0.35f, 0.3f, 1f);
+        renderer.color = new Color(1f, 0.45f, 0.4f, 1f);
         renderer.sortingOrder = 4;
 
         var glow = new GameObject("CornerGlow", typeof(SpriteRenderer));
