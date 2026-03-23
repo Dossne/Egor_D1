@@ -13,6 +13,8 @@ public static class RuntimeSpriteFactory
     private static Sprite mineBodySprite;
     private static Sprite tableSprite;
     private static Sprite spikeSprite;
+    private static Sprite starSprite;
+    private static Sprite ribbonBannerSprite;
 
     public static Sprite WhiteSprite
     {
@@ -157,6 +159,32 @@ public static class RuntimeSpriteFactory
             }
 
             return spikeSprite;
+        }
+    }
+
+    public static Sprite StarSprite
+    {
+        get
+        {
+            if (starSprite == null)
+            {
+                starSprite = CreateStarSprite(128);
+            }
+
+            return starSprite;
+        }
+    }
+
+    public static Sprite RibbonBannerSprite
+    {
+        get
+        {
+            if (ribbonBannerSprite == null)
+            {
+                ribbonBannerSprite = CreateRibbonBannerSprite(620, 146);
+            }
+
+            return ribbonBannerSprite;
         }
     }
 
@@ -453,19 +481,24 @@ public static class RuntimeSpriteFactory
             texture.SetPixel(x, y + 1, darkGrass);
         }
 
-        for (var i = 0; i < 160; i++)
+        for (var i = 0; i < 95; i++)
         {
-            var x = random.Next(2, size - 2);
-            var y = random.Next(2, size - 2);
-            texture.SetPixel(x, y, flowerCore);
-            if (random.NextDouble() > 0.45d)
+            var x = random.Next(6, size - 6);
+            var y = random.Next(6, size - 6);
+            PaintCircle(texture, new Vector2(x, y), 2.45f, flowerCore);
+            PaintCircle(texture, new Vector2(x - 2f, y), 2.2f, flowerPetal);
+            PaintCircle(texture, new Vector2(x + 2f, y), 2.2f, flowerPetal);
+            PaintCircle(texture, new Vector2(x, y - 2f), 2.2f, flowerPetal);
+            PaintCircle(texture, new Vector2(x, y + 2f), 2.2f, flowerPetal);
+
+            if (random.NextDouble() > 0.35d)
             {
-                texture.SetPixel(x + 1, y, flowerPetal);
+                PaintCircle(texture, new Vector2(x + 2f, y + 2f), 1.6f, flowerPetal);
             }
 
-            if (random.NextDouble() > 0.45d)
+            if (random.NextDouble() > 0.35d)
             {
-                texture.SetPixel(x, y + 1, flowerPetal);
+                PaintCircle(texture, new Vector2(x - 2f, y - 2f), 1.6f, flowerPetal);
             }
         }
 
@@ -540,6 +573,124 @@ public static class RuntimeSpriteFactory
                 }
             }
         }
+    }
+
+    private static Sprite CreateStarSprite(int size)
+    {
+        var texture = CreateTransparentTexture(size, size);
+        var center = new Vector2((size - 1) * 0.5f, (size - 1) * 0.5f);
+        var outerRadius = size * 0.46f;
+        var innerRadius = outerRadius * 0.47f;
+        var vertices = new Vector2[10];
+        for (var i = 0; i < vertices.Length; i++)
+        {
+            var angle = Mathf.Deg2Rad * (90f - i * 36f);
+            var radius = i % 2 == 0 ? outerRadius : innerRadius;
+            vertices[i] = center + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius;
+        }
+
+        for (var y = 0; y < size; y++)
+        {
+            for (var x = 0; x < size; x++)
+            {
+                var point = new Vector2(x + 0.5f, y + 0.5f);
+                if (!PointInPolygon(point, vertices))
+                {
+                    continue;
+                }
+
+                var gradient = Mathf.Clamp01((point.y - (center.y - outerRadius)) / (outerRadius * 2f));
+                var color = Color.Lerp(new Color(1f, 0.77f, 0.08f, 1f), new Color(1f, 0.9f, 0.32f, 1f), gradient);
+                if (point.x < center.x - size * 0.06f && point.y > center.y + size * 0.04f)
+                {
+                    color = Color.Lerp(color, Color.white, 0.2f);
+                }
+
+                texture.SetPixel(x, y, color);
+            }
+        }
+
+        texture.Apply();
+        return Sprite.Create(texture, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
+    }
+
+    private static Sprite CreateRibbonBannerSprite(int width, int height)
+    {
+        var texture = CreateTransparentTexture(width, height);
+        var bodyMinX = Mathf.RoundToInt(width * 0.1f);
+        var bodyMaxX = Mathf.RoundToInt(width * 0.9f);
+        var bodyMinY = Mathf.RoundToInt(height * 0.2f);
+        var bodyMaxY = Mathf.RoundToInt(height * 0.9f);
+        var centerX = width * 0.5f;
+
+        for (var y = bodyMinY; y < bodyMaxY; y++)
+        {
+            var gradient = Mathf.InverseLerp(bodyMinY, bodyMaxY, y);
+            for (var x = bodyMinX; x < bodyMaxX; x++)
+            {
+                var depth = 1f - Mathf.Clamp01(Mathf.Abs(x - centerX) / (width * 0.45f));
+                var tone = Mathf.Clamp01(gradient * 0.6f + depth * 0.4f);
+                var color = Color.Lerp(new Color(0.72f, 0.08f, 0.14f, 1f), new Color(0.9f, 0.17f, 0.22f, 1f), tone);
+                texture.SetPixel(x, y, color);
+            }
+        }
+
+        for (var x = bodyMinX; x < bodyMaxX; x++)
+        {
+            texture.SetPixel(x, bodyMaxY - 1, new Color(0.95f, 0.71f, 0.19f, 1f));
+            texture.SetPixel(x, bodyMinY, new Color(0.36f, 0.04f, 0.08f, 1f));
+        }
+
+        for (var y = Mathf.RoundToInt(height * 0.3f); y < bodyMinY + Mathf.RoundToInt((bodyMaxY - bodyMinY) * 0.45f); y++)
+        {
+            for (var x = 0; x < bodyMinX; x++)
+            {
+                var t = Mathf.InverseLerp(0f, bodyMinX, x);
+                var alpha = Mathf.SmoothStep(0f, 1f, t);
+                if (y < Mathf.Lerp(height * 0.28f, height * 0.55f, t) || y > Mathf.Lerp(height * 0.72f, height * 0.48f, t))
+                {
+                    continue;
+                }
+
+                texture.SetPixel(x, y, new Color(0.76f, 0.09f, 0.15f, alpha));
+            }
+
+            for (var x = bodyMaxX; x < width; x++)
+            {
+                var t = Mathf.InverseLerp(width - 1f, bodyMaxX, x);
+                var alpha = Mathf.SmoothStep(0f, 1f, t);
+                if (y < Mathf.Lerp(height * 0.28f, height * 0.55f, t) || y > Mathf.Lerp(height * 0.72f, height * 0.48f, t))
+                {
+                    continue;
+                }
+
+                texture.SetPixel(x, y, new Color(0.76f, 0.09f, 0.15f, alpha));
+            }
+        }
+
+        texture.Apply();
+        return Sprite.Create(texture, new Rect(0, 0, width, height), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect, new Vector4(18f, 18f, 18f, 18f));
+    }
+
+    private static bool PointInPolygon(Vector2 point, Vector2[] polygon)
+    {
+        var inside = false;
+        var j = polygon.Length - 1;
+        for (var i = 0; i < polygon.Length; i++)
+        {
+            var pointI = polygon[i];
+            var pointJ = polygon[j];
+            var intersects = (pointI.y > point.y) != (pointJ.y > point.y) &&
+                             point.x < (pointJ.x - pointI.x) * (point.y - pointI.y) / (pointJ.y - pointI.y + 0.0001f) + pointI.x;
+            if (intersects)
+            {
+                inside = !inside;
+            }
+
+            j = i;
+        }
+
+        return inside;
     }
 
     private static void PaintStem(Texture2D texture, int size)
