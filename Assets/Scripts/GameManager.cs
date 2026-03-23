@@ -486,11 +486,7 @@ public class GameManager : MonoBehaviour
             var obstacle = level.obstacles[i];
             if (obstacle.type == ObstacleType.Pillar)
             {
-                CreatePillarObstacle($"Pillar_{i + 1}", obstacle.position * levelScale, obstacle.radius * levelScale);
-            }
-            else
-            {
-                CreateLineObstacle($"Line_{i + 1}", obstacle.position * levelScale, obstacle.length * levelScale, obstacle.horizontal);
+                CreatePillarObstacle($"Pillar_{i + 1}", obstacle.position * levelScale, obstacle.radius);
             }
         }
     }
@@ -569,25 +565,7 @@ public class GameManager : MonoBehaviour
     {
         var random = new System.Random(9901 + levelIndex * 53);
         var obstacles = new List<ObstacleConfig>();
-        var pattern = (levelIndex - 1) % 5;
-
-        var pillarCount = pattern == 0 ? 4 : random.Next(2, 5);
-        var lineCount = pattern == 1 ? 2 : random.Next(1, 3);
-        if (pattern == 2)
-        {
-            pillarCount = 3;
-            lineCount = 1;
-        }
-        else if (pattern == 3)
-        {
-            pillarCount = 2;
-            lineCount = 2;
-        }
-        else if (pattern == 4)
-        {
-            pillarCount = 5;
-            lineCount = 1;
-        }
+        var pillarCount = random.Next(3, 6);
 
         for (var i = 0; i < pillarCount; i++)
         {
@@ -595,18 +573,7 @@ public class GameManager : MonoBehaviour
             {
                 type = ObstacleType.Pillar,
                 position = CreateObstaclePosition(random, obstacles),
-                radius = Mathf.Lerp(0.3f, 0.48f, (float)random.NextDouble())
-            });
-        }
-
-        for (var i = 0; i < lineCount; i++)
-        {
-            obstacles.Add(new ObstacleConfig
-            {
-                type = ObstacleType.Line,
-                position = CreateObstaclePosition(random, obstacles),
-                length = Mathf.Lerp(2.4f, 4.8f, (float)random.NextDouble()),
-                horizontal = random.NextDouble() > 0.5
+                radius = Mathf.Lerp(0.14f, 0.22f, (float)random.NextDouble())
             });
         }
 
@@ -734,11 +701,9 @@ public class GameManager : MonoBehaviour
         }
 
         levelArenaScales.Clear();
-        levelArenaScales.Add(1f);
-
         var minScale = Mathf.Min(nextLevelSizeMultiplierRange.x, nextLevelSizeMultiplierRange.y);
         var maxScale = Mathf.Max(nextLevelSizeMultiplierRange.x, nextLevelSizeMultiplierRange.y);
-        for (var i = 1; i < levels.Count; i++)
+        for (var i = 0; i < levels.Count; i++)
         {
             levelArenaScales.Add(Random.Range(minScale, maxScale));
         }
