@@ -1,6 +1,7 @@
 using UnityEngine;
 
-[RequireComponent(typeof(Rigidbody2D), typeof(CircleCollider2D), typeof(SpriteRenderer), typeof(SnakeBody))]
+[RequireComponent(typeof(Rigidbody2D), typeof(CircleCollider2D), typeof(SpriteRenderer))]
+[RequireComponent(typeof(SnakeBody))]
 public class SnakeController : MonoBehaviour
 {
     [SerializeField] private float moveSpeed = 3.5f;
