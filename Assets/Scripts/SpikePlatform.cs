@@ -11,6 +11,7 @@ public class SpikePlatform : MonoBehaviour
     [SerializeField] private float raisedSpikeOffset = 0.22f;
 
     private readonly List<Transform> spikeTransforms = new();
+    private readonly List<Vector3> spikeLoweredPositions = new();
     private readonly HashSet<SnakeController> snakesInside = new();
     private SpriteRenderer baseRenderer;
     private bool spikesExtended;
@@ -19,8 +20,9 @@ public class SpikePlatform : MonoBehaviour
     {
         spikeTransforms.Clear();
         spikeTransforms.AddRange(spikes);
+        CacheLoweredSpikePositions();
         baseRenderer = platformRenderer;
-        ApplySpikeOffset(loweredSpikeOffset);
+        ApplySpikeOffset(0f);
         SetSpikesVisible(false);
         StartCoroutine(SpikeCycleLoop());
     }
@@ -40,7 +42,7 @@ public class SpikePlatform : MonoBehaviour
     {
         spikesExtended = value;
         SetSpikesVisible(value);
-        ApplySpikeOffset(value ? raisedSpikeOffset : loweredSpikeOffset);
+        ApplySpikeOffset(value ? raisedSpikeOffset - loweredSpikeOffset : 0f);
 
         if (baseRenderer != null)
         {
@@ -73,8 +75,18 @@ public class SpikePlatform : MonoBehaviour
                 continue;
             }
 
-            var current = spike.localPosition;
-            spike.localPosition = new Vector3(current.x, yOffset, current.z);
+            var basePosition = i < spikeLoweredPositions.Count ? spikeLoweredPositions[i] : spike.localPosition;
+            spike.localPosition = new Vector3(basePosition.x, basePosition.y + yOffset, basePosition.z);
+        }
+    }
+
+    private void CacheLoweredSpikePositions()
+    {
+        spikeLoweredPositions.Clear();
+        for (var i = 0; i < spikeTransforms.Count; i++)
+        {
+            var spike = spikeTransforms[i];
+            spikeLoweredPositions.Add(spike == null ? Vector3.zero : spike.localPosition);
         }
     }
 
