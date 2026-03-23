@@ -18,7 +18,7 @@ public class Berry : MonoBehaviour
         renderer.sprite = RuntimeSpriteFactory.BerrySprite;
         renderer.color = Color.white;
         renderer.sortingOrder = 5;
-        transform.localScale = new Vector3(0.62f, 0.62f, 1f);
+        transform.localScale = new Vector3(0.744f, 0.744f, 1f);
     }
 
     private void OnTriggerEnter2D(Collider2D other)

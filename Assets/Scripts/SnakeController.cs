@@ -38,7 +38,7 @@ public class SnakeController : MonoBehaviour
         headRenderer.sprite = RuntimeSpriteFactory.SnakeHeadSprite;
         headRenderer.color = Color.white;
         headRenderer.sortingOrder = 4;
-        transform.localScale = new Vector3(0.68f, 0.68f, 1f);
+        transform.localScale = new Vector3(0.816f, 0.816f, 1f);
 
         snakeBody = GetComponent<SnakeBody>();
         snakeBody.Initialize(transform, Mathf.Max(0, startLength - 1), transform.parent);
