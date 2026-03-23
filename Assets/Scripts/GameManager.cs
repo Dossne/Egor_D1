@@ -242,7 +242,7 @@ public class GameManager : MonoBehaviour
         menuRect.anchorMin = new Vector2(0.5f, 0.5f);
         menuRect.anchorMax = new Vector2(0.5f, 0.5f);
         menuRect.pivot = new Vector2(0.5f, 0.5f);
-        menuRect.sizeDelta = new Vector2(700f, 420f);
+        menuRect.sizeDelta = new Vector2(700f, 760f);
         var menuBackground = levelCompleteMenu.GetComponent<Image>();
         menuBackground.sprite = uiPopupSprite;
         menuBackground.type = uiPopupSprite != null ? Image.Type.Sliced : Image.Type.Simple;
@@ -250,14 +250,14 @@ public class GameManager : MonoBehaviour
             ? Color.white
             : panelTintColor;
 
-        CreateDecorativeIcon(levelCompleteMenu.transform, "ResultIcon", uiWinIconSprite, new Vector2(0f, 165f), new Vector2(92f, 92f), iconTintColor);
+        CreateDecorativeIcon(levelCompleteMenu.transform, "ResultIcon", uiWinIconSprite, new Vector2(0f, 300f), new Vector2(92f, 92f), iconTintColor);
 
-        levelCompleteText = CreateText(levelCompleteMenu.transform, "LevelCompleteText", new Vector2(0f, 130f), new Vector2(640f, 120f), TextAnchor.MiddleCenter, 72);
+        levelCompleteText = CreateText(levelCompleteMenu.transform, "LevelCompleteText", new Vector2(0f, 100f), new Vector2(640f, 120f), TextAnchor.MiddleCenter, 72);
         var levelCompleteRect = levelCompleteText.GetComponent<RectTransform>();
         levelCompleteRect.anchorMin = new Vector2(0.5f, 0.5f);
         levelCompleteRect.anchorMax = new Vector2(0.5f, 0.5f);
         levelCompleteRect.pivot = new Vector2(0.5f, 0.5f);
-        levelCompleteRect.anchoredPosition = new Vector2(0f, 130f);
+        levelCompleteRect.anchoredPosition = new Vector2(0f, 100f);
         levelCompleteText.color = bodyTextColor;
         levelCompleteText.text = "great run!";
 
@@ -267,25 +267,28 @@ public class GameManager : MonoBehaviour
         ribbonRect.anchorMin = new Vector2(0.5f, 0.5f);
         ribbonRect.anchorMax = new Vector2(0.5f, 0.5f);
         ribbonRect.pivot = new Vector2(0.5f, 0.5f);
-        ribbonRect.anchoredPosition = new Vector2(0f, 200f);
+        ribbonRect.anchoredPosition = new Vector2(0f, 235f);
         ribbonRect.sizeDelta = new Vector2(620f, 146f);
         var ribbonImage = ribbonObject.GetComponent<Image>();
         ribbonImage.sprite = uiResultRibbonSprite != null ? uiResultRibbonSprite : RuntimeSpriteFactory.RibbonBannerSprite;
         ribbonImage.type = Image.Type.Sliced;
         ribbonImage.color = Color.white;
 
-        resultRibbonText = CreateText(ribbonObject.transform, "RibbonText", Vector2.zero, new Vector2(560f, 110f), TextAnchor.MiddleCenter, 56);
+        resultRibbonText = CreateText(ribbonObject.transform, "RibbonText", Vector2.zero, new Vector2(560f, 110f), TextAnchor.MiddleCenter, 48);
         var ribbonTextRect = resultRibbonText.GetComponent<RectTransform>();
         ribbonTextRect.anchorMin = new Vector2(0.5f, 0.5f);
         ribbonTextRect.anchorMax = new Vector2(0.5f, 0.5f);
         ribbonTextRect.pivot = new Vector2(0.5f, 0.5f);
         ribbonTextRect.anchoredPosition = new Vector2(0f, 0f);
         resultRibbonText.color = Color.white;
+        resultRibbonText.resizeTextForBestFit = true;
+        resultRibbonText.resizeTextMinSize = 26;
+        resultRibbonText.resizeTextMaxSize = 48;
 
         CreateStarRow(levelCompleteMenu.transform);
 
-        nextLevelButton = CreateMenuButton(levelCompleteMenu.transform, "NextLevelButton", "next level", new Vector2(0f, 10f), uiWinIconSprite, HandleNextLevelPressed);
-        CreateMenuButton(levelCompleteMenu.transform, "RetryButton", "retry", new Vector2(0f, -120f), uiRetryIconSprite, HandleRetryPressed);
+        nextLevelButton = CreateMenuButton(levelCompleteMenu.transform, "NextLevelButton", "next level", new Vector2(0f, -90f), uiWinIconSprite, HandleNextLevelPressed);
+        CreateMenuButton(levelCompleteMenu.transform, "RetryButton", "retry", new Vector2(0f, -220f), uiRetryIconSprite, HandleRetryPressed);
         levelCompleteMenu.SetActive(false);
     }
 
@@ -297,7 +300,7 @@ public class GameManager : MonoBehaviour
         starsRootRect.anchorMin = new Vector2(0.5f, 0.5f);
         starsRootRect.anchorMax = new Vector2(0.5f, 0.5f);
         starsRootRect.pivot = new Vector2(0.5f, 0.5f);
-        starsRootRect.anchoredPosition = new Vector2(0f, 90f);
+        starsRootRect.anchoredPosition = new Vector2(0f, 165f);
         starsRootRect.sizeDelta = new Vector2(480f, 130f);
 
         var layout = starsRoot.GetComponent<HorizontalLayoutGroup>();
@@ -1371,8 +1374,8 @@ public class GameManager : MonoBehaviour
         buttonRect.sizeDelta = new Vector2(420f, 92f);
 
         var buttonImage = buttonObject.GetComponent<Image>();
-        buttonImage.sprite = uiButtonSprite;
-        buttonImage.type = uiButtonSprite != null ? Image.Type.Sliced : Image.Type.Simple;
+        buttonImage.sprite = uiButtonSprite != null ? uiButtonSprite : RuntimeSpriteFactory.RoundedButtonSprite;
+        buttonImage.type = Image.Type.Sliced;
         buttonImage.color = uiButtonSprite != null
             ? Color.white
             : buttonFallbackColor;
