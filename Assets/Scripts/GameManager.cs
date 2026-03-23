@@ -60,6 +60,7 @@ public class GameManager : MonoBehaviour
     [SerializeField] private float snakeSpeedBoostFactor = 1.25f;
     [SerializeField] private float levelTimerDurationSeconds = 40f;
     [SerializeField] private float deathMenuDelaySeconds = 1f;
+    [SerializeField] private float failedMenuVerticalOffset = 64f;
     [SerializeField] private List<LevelConfig> levels = new();
 
     [Header("Arena")]
@@ -103,6 +104,7 @@ public class GameManager : MonoBehaviour
     private Transform arenaRoot;
     private AudioSource musicAudioSource;
     private AudioSource sfxAudioSource;
+    private AudioSource failureAudioSource;
     private readonly List<float> levelArenaScales = new();
     private Vector2 currentArenaSize;
     private int currentLevelIndex;
@@ -439,7 +441,7 @@ public class GameManager : MonoBehaviour
 
         levelFinished = true;
         isResultMenuPending = true;
-        PlaySound(obstacleHitSound);
+        PlayFailureSound(obstacleHitSound);
         if (snakeController != null)
         {
             snakeController.gameObject.SetActive(false);
@@ -465,6 +467,9 @@ public class GameManager : MonoBehaviour
         {
             levelCompleteMenu.SetActive(false);
         }
+
+        StopFailureSound();
+        ResumeBackgroundMusic();
 
         if (snakeController != null)
         {
@@ -550,7 +555,108 @@ public class GameManager : MonoBehaviour
             {
                 levels[i].spikePlatforms = GenerateSpikePlatformsForLevel(i, levels[i].obstacles);
             }
+
+            EnsureLateGameObstacleDensity(i);
         }
+    }
+
+    private void EnsureLateGameObstacleDensity(int levelIndex)
+    {
+        if (levelIndex < 3 || levelIndex >= levels.Count)
+        {
+            return;
+        }
+
+        var level = levels[levelIndex];
+        level.obstacles ??= new List<ObstacleConfig>();
+        level.spikePlatforms ??= new List<SpikePlatformConfig>();
+
+        var random = new System.Random(14327 + levelIndex * 89);
+        var targetObstacleCount = random.Next(8, 12);
+
+        var totalObstacleCount = CountMineObstacles(level.obstacles) + level.spikePlatforms.Count;
+        while (totalObstacleCount < targetObstacleCount)
+        {
+            var shouldAddSpike = level.spikePlatforms.Count == 0 || random.NextDouble() < 0.42;
+            if (shouldAddSpike)
+            {
+                var position = CreateSpikePlatformPosition(random, level.spikePlatforms, level.obstacles);
+                level.spikePlatforms.Add(new SpikePlatformConfig
+                {
+                    position = position,
+                    size = new Vector2(
+                        Mathf.Lerp(1.12f, 1.34f, (float)random.NextDouble()),
+                        Mathf.Lerp(1.12f, 1.34f, (float)random.NextDouble()))
+                });
+            }
+            else
+            {
+                level.obstacles.Add(new ObstacleConfig
+                {
+                    type = ObstacleType.Pillar,
+                    position = CreateObstaclePosition(random, level.obstacles),
+                    radius = Mathf.Lerp(0.14f, 0.22f, (float)random.NextDouble())
+                });
+            }
+
+            totalObstacleCount++;
+        }
+
+        while (totalObstacleCount > 11)
+        {
+            if (level.spikePlatforms.Count > 0)
+            {
+                level.spikePlatforms.RemoveAt(level.spikePlatforms.Count - 1);
+                totalObstacleCount--;
+                continue;
+            }
+
+            var mineIndex = FindLastMineObstacleIndex(level.obstacles);
+            if (mineIndex < 0)
+            {
+                break;
+            }
+
+            level.obstacles.RemoveAt(mineIndex);
+            totalObstacleCount--;
+        }
+    }
+
+    private int CountMineObstacles(List<ObstacleConfig> obstacles)
+    {
+        if (obstacles == null)
+        {
+            return 0;
+        }
+
+        var count = 0;
+        for (var i = 0; i < obstacles.Count; i++)
+        {
+            if (obstacles[i].type == ObstacleType.Pillar)
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private int FindLastMineObstacleIndex(List<ObstacleConfig> obstacles)
+    {
+        if (obstacles == null)
+        {
+            return -1;
+        }
+
+        for (var i = obstacles.Count - 1; i >= 0; i--)
+        {
+            if (obstacles[i].type == ObstacleType.Pillar)
+            {
+                return i;
+            }
+        }
+
+        return -1;
     }
 
     private void HandleNextLevelPressed()
@@ -1236,6 +1342,17 @@ public class GameManager : MonoBehaviour
             nextLevelButton.SetActive(showNextLevelButton);
         }
 
+        var menuRect = levelCompleteMenu.GetComponent<RectTransform>();
+        if (menuRect != null)
+        {
+            menuRect.anchoredPosition = showNextLevelButton ? Vector2.zero : new Vector2(0f, failedMenuVerticalOffset);
+        }
+
+        if (!showNextLevelButton)
+        {
+            StopBackgroundMusic();
+        }
+
         levelCompleteMenu.SetActive(true);
     }
 
@@ -1261,7 +1378,7 @@ public class GameManager : MonoBehaviour
             snakeController.gameObject.SetActive(false);
         }
 
-        StartCoroutine(ShowResultMenuAfterDelay("time left", false));
+        StartCoroutine(ShowResultMenuAfterDelay("level failed", false));
     }
 
     private void UpdateTimerVisual()
@@ -1476,6 +1593,10 @@ public class GameManager : MonoBehaviour
         sfxAudioSource.playOnAwake = false;
         sfxAudioSource.spatialBlend = 0f;
 
+        failureAudioSource = gameObject.AddComponent<AudioSource>();
+        failureAudioSource.playOnAwake = false;
+        failureAudioSource.spatialBlend = 0f;
+
         ApplySoundConfig(musicAudioSource, backgroundMusicSound);
         if (backgroundMusicSound.clip != null)
         {
@@ -1529,6 +1650,44 @@ public class GameManager : MonoBehaviour
 
         sfxAudioSource.pitch = config.pitch;
         sfxAudioSource.PlayOneShot(config.clip, config.volume);
+    }
+
+    private void PlayFailureSound(SoundConfig config)
+    {
+        if (failureAudioSource == null || config == null || config.clip == null)
+        {
+            return;
+        }
+
+        failureAudioSource.loop = false;
+        failureAudioSource.clip = config.clip;
+        failureAudioSource.volume = config.volume;
+        failureAudioSource.pitch = config.pitch;
+        failureAudioSource.Play();
+    }
+
+    private void StopFailureSound()
+    {
+        if (failureAudioSource != null && failureAudioSource.isPlaying)
+        {
+            failureAudioSource.Stop();
+        }
+    }
+
+    private void StopBackgroundMusic()
+    {
+        if (musicAudioSource != null && musicAudioSource.isPlaying)
+        {
+            musicAudioSource.Stop();
+        }
+    }
+
+    private void ResumeBackgroundMusic()
+    {
+        if (musicAudioSource != null && backgroundMusicSound.clip != null && !musicAudioSource.isPlaying)
+        {
+            musicAudioSource.Play();
+        }
     }
 
     private void TryAutoAssignGuiProAssets()
