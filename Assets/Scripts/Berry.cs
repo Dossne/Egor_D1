@@ -15,13 +15,14 @@ public class Berry : MonoBehaviour
         collider.isTrigger = true;
 
         var renderer = GetComponent<SpriteRenderer>();
-        renderer.sprite = RuntimeSpriteFactory.WhiteSprite;
+        renderer.sprite = RuntimeSpriteFactory.CircleSprite;
         renderer.color = new Color(0.9f, 0.15f, 0.2f);
         renderer.sortingOrder = 5;
         transform.localScale = new Vector3(0.52f, 0.52f, 1f);
 
-        CreateEye("EyeLeft", new Vector3(-0.06f, 0.05f, 0f));
-        CreateEye("EyeRight", new Vector3(0.06f, 0.05f, 0f));
+        CreateDot("EyeLeft", new Vector3(-0.08f, 0.07f, 0f), new Vector3(0.08f, 0.08f, 1f));
+        CreateDot("EyeRight", new Vector3(0.08f, 0.07f, 0f), new Vector3(0.08f, 0.08f, 1f));
+        CreateSmile();
     }
 
     private void OnTriggerEnter2D(Collider2D other)
@@ -36,31 +37,40 @@ public class Berry : MonoBehaviour
         gameManager.HandleBerryCollected(this);
     }
 
-    private void CreateEye(string eyeName, Vector3 localPosition)
+    private void CreateDot(string name, Vector3 localPosition, Vector3 scale)
     {
-        if (transform.Find(eyeName) != null)
+        if (transform.Find(name) != null)
         {
             return;
         }
 
-        var eye = new GameObject(eyeName);
-        eye.transform.SetParent(transform, false);
-        eye.transform.localPosition = localPosition;
-        eye.transform.localScale = new Vector3(0.12f, 0.12f, 1f);
+        var dot = new GameObject(name);
+        dot.transform.SetParent(transform, false);
+        dot.transform.localPosition = localPosition;
+        dot.transform.localScale = scale;
 
-        var eyeRenderer = eye.AddComponent<SpriteRenderer>();
-        eyeRenderer.sprite = RuntimeSpriteFactory.WhiteSprite;
-        eyeRenderer.color = Color.white;
-        eyeRenderer.sortingOrder = 1;
+        var dotRenderer = dot.AddComponent<SpriteRenderer>();
+        dotRenderer.sprite = RuntimeSpriteFactory.CircleSprite;
+        dotRenderer.color = Color.black;
+        dotRenderer.sortingOrder = 6;
+    }
 
-        var pupil = new GameObject("Pupil");
-        pupil.transform.SetParent(eye.transform, false);
-        pupil.transform.localPosition = new Vector3(0f, -0.02f, 0f);
-        pupil.transform.localScale = new Vector3(0.4f, 0.4f, 1f);
+    private void CreateSmile()
+    {
+        const string smileName = "Smile";
+        if (transform.Find(smileName) != null)
+        {
+            return;
+        }
 
-        var pupilRenderer = pupil.AddComponent<SpriteRenderer>();
-        pupilRenderer.sprite = RuntimeSpriteFactory.WhiteSprite;
-        pupilRenderer.color = Color.black;
-        pupilRenderer.sortingOrder = 2;
+        var smile = new GameObject(smileName);
+        smile.transform.SetParent(transform, false);
+        smile.transform.localPosition = new Vector3(0f, -0.06f, 0f);
+        smile.transform.localScale = new Vector3(0.45f, 0.25f, 1f);
+
+        var smileRenderer = smile.AddComponent<SpriteRenderer>();
+        smileRenderer.sprite = RuntimeSpriteFactory.SmileSprite;
+        smileRenderer.color = Color.black;
+        smileRenderer.sortingOrder = 6;
     }
 }

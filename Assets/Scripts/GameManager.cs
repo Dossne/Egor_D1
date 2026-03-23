@@ -9,7 +9,7 @@ public class GameManager : MonoBehaviour
     [SerializeField] private int startSnakeLength = 5;
     [SerializeField] private int berryCount = 3;
     [SerializeField] private int growthPerBerry = 3;
-    [SerializeField] private float snakeSpeed = 3.5f;
+    [SerializeField] private float snakeSpeed = 2.625f;
 
     [Header("Arena")]
     [SerializeField] private Vector2 arenaSize = new(8f, 12f);
@@ -109,7 +109,9 @@ public class GameManager : MonoBehaviour
 
         var joystickBg = joystickRoot.GetComponent<Image>();
         joystickBg.color = new Color(1f, 1f, 1f, 0.18f);
-        joystickBg.sprite = RuntimeSpriteFactory.WhiteSprite;
+        joystickBg.sprite = RuntimeSpriteFactory.CircleSprite;
+        joystickBg.type = Image.Type.Simple;
+        joystickBg.preserveAspect = true;
         joystickBg.raycastTarget = false;
 
         var handleObject = new GameObject("Handle", typeof(RectTransform), typeof(Image));
@@ -117,8 +119,10 @@ public class GameManager : MonoBehaviour
         var handleRect = handleObject.GetComponent<RectTransform>();
         handleRect.sizeDelta = new Vector2(90f, 90f);
         var handleImage = handleObject.GetComponent<Image>();
-        handleImage.sprite = RuntimeSpriteFactory.WhiteSprite;
+        handleImage.sprite = RuntimeSpriteFactory.CircleSprite;
         handleImage.color = new Color(1f, 1f, 1f, 0.55f);
+        handleImage.type = Image.Type.Simple;
+        handleImage.preserveAspect = true;
         handleImage.raycastTarget = false;
 
         joystickInput = joystickArea.GetComponent<JoystickInput>();
@@ -143,10 +147,20 @@ public class GameManager : MonoBehaviour
     private void BuildArena()
     {
         CreateArenaBackground();
-        CreateWall("TopWall", new Vector2(0f, arenaSize.y * 0.5f + wallThickness * 0.5f), new Vector2(arenaSize.x + wallThickness * 2f, wallThickness));
-        CreateWall("BottomWall", new Vector2(0f, -arenaSize.y * 0.5f - wallThickness * 0.5f), new Vector2(arenaSize.x + wallThickness * 2f, wallThickness));
-        CreateWall("LeftWall", new Vector2(-arenaSize.x * 0.5f - wallThickness * 0.5f, 0f), new Vector2(wallThickness, arenaSize.y));
-        CreateWall("RightWall", new Vector2(arenaSize.x * 0.5f + wallThickness * 0.5f, 0f), new Vector2(wallThickness, arenaSize.y));
+        var topPosition = new Vector2(0f, arenaSize.y * 0.5f + wallThickness * 0.5f);
+        var bottomPosition = new Vector2(0f, -arenaSize.y * 0.5f - wallThickness * 0.5f);
+        var leftPosition = new Vector2(-arenaSize.x * 0.5f - wallThickness * 0.5f, 0f);
+        var rightPosition = new Vector2(arenaSize.x * 0.5f + wallThickness * 0.5f, 0f);
+
+        CreateWall("TopWall", topPosition, new Vector2(arenaSize.x + wallThickness * 2f, wallThickness));
+        CreateWall("BottomWall", bottomPosition, new Vector2(arenaSize.x + wallThickness * 2f, wallThickness));
+        CreateWall("LeftWall", leftPosition, new Vector2(wallThickness, arenaSize.y));
+        CreateWall("RightWall", rightPosition, new Vector2(wallThickness, arenaSize.y));
+
+        CreateLaserCorner("TopLeftCorner", new Vector2(leftPosition.x, topPosition.y));
+        CreateLaserCorner("TopRightCorner", new Vector2(rightPosition.x, topPosition.y));
+        CreateLaserCorner("BottomLeftCorner", new Vector2(leftPosition.x, bottomPosition.y));
+        CreateLaserCorner("BottomRightCorner", new Vector2(rightPosition.x, bottomPosition.y));
     }
 
     private void CreateSnake()
@@ -279,12 +293,42 @@ public class GameManager : MonoBehaviour
 
         var renderer = wall.GetComponent<SpriteRenderer>();
         renderer.sprite = RuntimeSpriteFactory.WhiteSprite;
-        renderer.color = new Color(0.2f, 0.95f, 1f, 0.9f);
-        renderer.sortingOrder = 2;
+        renderer.color = new Color(1f, 0.24f, 0.19f, 1f);
+        renderer.sortingOrder = 3;
+
+        var glow = new GameObject("Glow", typeof(SpriteRenderer));
+        glow.transform.SetParent(wall.transform, false);
+        glow.transform.localScale = new Vector3(1.35f, 2.8f, 1f);
+
+        var glowRenderer = glow.GetComponent<SpriteRenderer>();
+        glowRenderer.sprite = RuntimeSpriteFactory.WhiteSprite;
+        glowRenderer.color = new Color(1f, 0.09f, 0.09f, 0.38f);
+        glowRenderer.sortingOrder = 2;
 
         var collider = wall.GetComponent<BoxCollider2D>();
         collider.isTrigger = true;
         collider.size = Vector2.one;
+    }
+
+    private static void CreateLaserCorner(string name, Vector2 position)
+    {
+        var corner = new GameObject(name, typeof(SpriteRenderer));
+        corner.transform.position = position;
+        corner.transform.localScale = new Vector3(0.5f, 0.5f, 1f);
+
+        var renderer = corner.GetComponent<SpriteRenderer>();
+        renderer.sprite = RuntimeSpriteFactory.CircleSprite;
+        renderer.color = new Color(1f, 0.35f, 0.3f, 1f);
+        renderer.sortingOrder = 4;
+
+        var glow = new GameObject("CornerGlow", typeof(SpriteRenderer));
+        glow.transform.SetParent(corner.transform, false);
+        glow.transform.localScale = new Vector3(2f, 2f, 1f);
+
+        var glowRenderer = glow.GetComponent<SpriteRenderer>();
+        glowRenderer.sprite = RuntimeSpriteFactory.CircleSprite;
+        glowRenderer.color = new Color(1f, 0.1f, 0.1f, 0.32f);
+        glowRenderer.sortingOrder = 1;
     }
 
     private void CreateArenaBackground()
