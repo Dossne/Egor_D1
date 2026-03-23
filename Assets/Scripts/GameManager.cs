@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -192,6 +193,28 @@ public class GameManager : MonoBehaviour
         }
     }
 
+    public void SpawnBerryJuiceSplash(Vector3 center)
+    {
+        const int dropletCount = 9;
+        for (var i = 0; i < dropletCount; i++)
+        {
+            var droplet = new GameObject($"JuiceDrop_{i + 1}", typeof(SpriteRenderer));
+            droplet.transform.position = center;
+            droplet.transform.localScale = Vector3.one * Random.Range(0.1f, 0.18f);
+
+            var dropletRenderer = droplet.GetComponent<SpriteRenderer>();
+            dropletRenderer.sprite = RuntimeSpriteFactory.CircleSprite;
+            dropletRenderer.color = new Color(0.9f, 0.16f, 0.18f, Random.Range(0.68f, 0.86f));
+            dropletRenderer.sortingOrder = 0;
+
+            var angle = Random.Range(0f, Mathf.PI * 2f);
+            var direction = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
+            var distance = Random.Range(0.28f, 1.05f);
+            var duration = Random.Range(0.12f, 0.24f);
+            StartCoroutine(AnimateJuiceDroplet(droplet.transform, center, direction * distance, duration));
+        }
+    }
+
     public void HandleLose()
     {
         if (levelFinished)
@@ -287,9 +310,17 @@ public class GameManager : MonoBehaviour
 
     private static void CreateWall(string name, Vector2 position, Vector2 size)
     {
+        var isVerticalWall = size.y > size.x;
         var wall = new GameObject(name, typeof(SpriteRenderer), typeof(BoxCollider2D), typeof(WallCollision));
         wall.transform.position = position;
-        wall.transform.localScale = new Vector3(size.x, size.y, 1f);
+        wall.transform.localScale = isVerticalWall
+            ? new Vector3(size.y, size.x, 1f)
+            : new Vector3(size.x, size.y, 1f);
+
+        if (isVerticalWall)
+        {
+            wall.transform.rotation = Quaternion.Euler(0f, 0f, 90f);
+        }
 
         var renderer = wall.GetComponent<SpriteRenderer>();
         renderer.sprite = RuntimeSpriteFactory.WallSprite;
@@ -308,6 +339,25 @@ public class GameManager : MonoBehaviour
         var collider = wall.GetComponent<BoxCollider2D>();
         collider.isTrigger = true;
         collider.size = Vector2.one;
+    }
+
+    private static IEnumerator AnimateJuiceDroplet(Transform droplet, Vector3 startPosition, Vector2 offset, float duration)
+    {
+        var elapsed = 0f;
+        var targetPosition = startPosition + (Vector3)offset;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            var t = Mathf.Clamp01(elapsed / duration);
+            var easeOut = 1f - (1f - t) * (1f - t);
+            droplet.position = Vector3.Lerp(startPosition, targetPosition, easeOut);
+            yield return null;
+        }
+
+        if (droplet != null)
+        {
+            droplet.position = targetPosition;
+        }
     }
 
     private static void CreateLaserCorner(string name, Vector2 position)

@@ -6,6 +6,7 @@ public static class RuntimeSpriteFactory
     private static Sprite circleSprite;
     private static Sprite smileSprite;
     private static Sprite snakeHeadSprite;
+    private static Sprite snakeHeadEatingSprite;
     private static Sprite snakeBodySprite;
     private static Sprite berrySprite;
     private static Sprite wallSprite;
@@ -58,10 +59,23 @@ public static class RuntimeSpriteFactory
         {
             if (snakeHeadSprite == null)
             {
-                snakeHeadSprite = CreateSnakeHeadSprite(128);
+                snakeHeadSprite = CreateSnakeHeadSprite(128, false);
             }
 
             return snakeHeadSprite;
+        }
+    }
+
+    public static Sprite SnakeHeadEatingSprite
+    {
+        get
+        {
+            if (snakeHeadEatingSprite == null)
+            {
+                snakeHeadEatingSprite = CreateSnakeHeadSprite(128, true);
+            }
+
+            return snakeHeadEatingSprite;
         }
     }
 
@@ -199,7 +213,7 @@ public static class RuntimeSpriteFactory
         return Sprite.Create(texture, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
     }
 
-    private static Sprite CreateSnakeHeadSprite(int size)
+    private static Sprite CreateSnakeHeadSprite(int size, bool mouthOpen)
     {
         var texture = CreateTransparentTexture(size, size);
         var center = new Vector2((size - 1) * 0.5f, (size - 1) * 0.5f);
@@ -230,8 +244,19 @@ public static class RuntimeSpriteFactory
             }
         }
 
-        PaintCircle(texture, new Vector2(size * 0.2f, size * 0.58f), size * 0.1f, new Color(1f, 0.86f, 0.2f, 1f));
-        PaintCircle(texture, new Vector2(size * 0.2f, size * 0.58f), size * 0.07f, new Color(0.99f, 0.75f, 0.15f, 1f));
+        PaintCircle(texture, new Vector2(size * 0.62f, size * 0.6f), size * 0.05f, Color.black);
+        PaintCircle(texture, new Vector2(size * 0.62f, size * 0.43f), size * 0.05f, Color.black);
+
+        if (mouthOpen)
+        {
+            PaintCircle(texture, new Vector2(size * 0.8f, size * 0.52f), size * 0.12f, new Color(0.3f, 0f, 0f, 1f));
+            PaintCircle(texture, new Vector2(size * 0.82f, size * 0.52f), size * 0.085f, new Color(0.85f, 0.2f, 0.25f, 1f));
+        }
+        else
+        {
+            PaintCircle(texture, new Vector2(size * 0.79f, size * 0.49f), size * 0.03f, new Color(0.3f, 0f, 0f, 1f));
+            PaintCircle(texture, new Vector2(size * 0.81f, size * 0.49f), size * 0.03f, new Color(0.3f, 0f, 0f, 1f));
+        }
 
         texture.Apply();
         return Sprite.Create(texture, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
