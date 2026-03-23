@@ -21,6 +21,7 @@ public class GameManager : MonoBehaviour
 
     private readonly List<Vector2> initialBerryPositions = new();
     private readonly List<Berry> activeBerries = new();
+    private readonly List<GameObject> activeJuiceDroplets = new();
 
     private SnakeController snakeController;
     private JoystickInput joystickInput;
@@ -201,6 +202,7 @@ public class GameManager : MonoBehaviour
             var droplet = new GameObject($"JuiceDrop_{i + 1}", typeof(SpriteRenderer));
             droplet.transform.position = center;
             droplet.transform.localScale = Vector3.one * Random.Range(0.1f, 0.18f);
+            activeJuiceDroplets.Add(droplet);
 
             var dropletRenderer = droplet.GetComponent<SpriteRenderer>();
             dropletRenderer.sprite = RuntimeSpriteFactory.CircleSprite;
@@ -211,7 +213,7 @@ public class GameManager : MonoBehaviour
             var direction = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
             var distance = Random.Range(0.28f, 1.05f);
             var duration = Random.Range(0.12f, 0.24f);
-            StartCoroutine(AnimateJuiceDroplet(droplet.transform, center, direction * distance, duration));
+            StartCoroutine(AnimateJuiceDroplet(droplet, center, direction * distance, duration));
         }
     }
 
@@ -245,6 +247,7 @@ public class GameManager : MonoBehaviour
         }
 
         activeBerries.Clear();
+        ClearJuiceDroplets();
 
         CreateSnake();
         CreateOrRestoreBerries(useStoredPositions: true);
@@ -341,8 +344,14 @@ public class GameManager : MonoBehaviour
         collider.size = Vector2.one;
     }
 
-    private static IEnumerator AnimateJuiceDroplet(Transform droplet, Vector3 startPosition, Vector2 offset, float duration)
+    private IEnumerator AnimateJuiceDroplet(GameObject droplet, Vector3 startPosition, Vector2 offset, float duration)
     {
+        if (droplet == null)
+        {
+            yield break;
+        }
+
+        var dropletTransform = droplet.transform;
         var elapsed = 0f;
         var targetPosition = startPosition + (Vector3)offset;
         while (elapsed < duration)
@@ -350,14 +359,30 @@ public class GameManager : MonoBehaviour
             elapsed += Time.deltaTime;
             var t = Mathf.Clamp01(elapsed / duration);
             var easeOut = 1f - (1f - t) * (1f - t);
-            droplet.position = Vector3.Lerp(startPosition, targetPosition, easeOut);
+            dropletTransform.position = Vector3.Lerp(startPosition, targetPosition, easeOut);
             yield return null;
         }
 
         if (droplet != null)
         {
-            droplet.position = targetPosition;
+            dropletTransform.position = targetPosition;
+            activeJuiceDroplets.Remove(droplet);
+            Destroy(droplet);
         }
+    }
+
+    private void ClearJuiceDroplets()
+    {
+        for (var i = activeJuiceDroplets.Count - 1; i >= 0; i--)
+        {
+            var droplet = activeJuiceDroplets[i];
+            if (droplet != null)
+            {
+                Destroy(droplet);
+            }
+        }
+
+        activeJuiceDroplets.Clear();
     }
 
     private static void CreateLaserCorner(string name, Vector2 position)
