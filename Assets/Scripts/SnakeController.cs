@@ -6,14 +6,17 @@ public class SnakeController : MonoBehaviour
 {
     [SerializeField] private float moveSpeed = 3.5f;
     [SerializeField] private float turnSpeedDegreesPerSecond = 180f;
+    [SerializeField] private float eatAnimationDuration = 0.14f;
 
     private Rigidbody2D rb;
+    private SpriteRenderer headRenderer;
     private SnakeBody snakeBody;
     private JoystickInput joystickInput;
     private GameManager gameManager;
     private Vector2 currentDirection = Vector2.right;
     private Vector2 previousPosition;
     private float movedDistance;
+    private float eatAnimationTimer;
     private bool selfCollisionEnabled;
     private bool isAlive;
 
@@ -31,10 +34,10 @@ public class SnakeController : MonoBehaviour
         var collider = GetComponent<CircleCollider2D>();
         collider.isTrigger = true;
 
-        var renderer = GetComponent<SpriteRenderer>();
-        renderer.sprite = RuntimeSpriteFactory.SnakeHeadSprite;
-        renderer.color = Color.white;
-        renderer.sortingOrder = 4;
+        headRenderer = GetComponent<SpriteRenderer>();
+        headRenderer.sprite = RuntimeSpriteFactory.SnakeHeadSprite;
+        headRenderer.color = Color.white;
+        headRenderer.sortingOrder = 4;
         transform.localScale = new Vector3(0.68f, 0.68f, 1f);
 
         snakeBody = GetComponent<SnakeBody>();
@@ -43,6 +46,7 @@ public class SnakeController : MonoBehaviour
         currentDirection = Vector2.right;
         previousPosition = rb.position;
         movedDistance = 0f;
+        eatAnimationTimer = 0f;
         selfCollisionEnabled = false;
         isAlive = true;
     }
@@ -83,11 +87,26 @@ public class SnakeController : MonoBehaviour
         }
 
         snakeBody.TickFollow(transform.position);
+
+        if (eatAnimationTimer > 0f)
+        {
+            eatAnimationTimer -= Time.fixedDeltaTime;
+            if (eatAnimationTimer <= 0f)
+            {
+                ApplyHeadSprite(false);
+            }
+        }
     }
 
     public void Grow(int amount)
     {
         snakeBody.Grow(amount);
+    }
+
+    public void PlayEatAnimation()
+    {
+        eatAnimationTimer = eatAnimationDuration;
+        ApplyHeadSprite(true);
     }
 
     public void Kill()
@@ -126,5 +145,15 @@ public class SnakeController : MonoBehaviour
                 }
             }
         }
+    }
+
+    private void ApplyHeadSprite(bool isEating)
+    {
+        if (headRenderer == null)
+        {
+            return;
+        }
+
+        headRenderer.sprite = isEating ? RuntimeSpriteFactory.SnakeHeadEatingSprite : RuntimeSpriteFactory.SnakeHeadSprite;
     }
 }

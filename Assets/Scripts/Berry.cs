@@ -30,6 +30,8 @@ public class Berry : MonoBehaviour
         }
 
         snake.Grow(growthAmount);
+        snake.PlayEatAnimation();
+        gameManager.SpawnBerryJuiceSplash(transform.position);
         gameManager.HandleBerryCollected(this);
     }
 
