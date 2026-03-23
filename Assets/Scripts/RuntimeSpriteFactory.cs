@@ -11,6 +11,7 @@ public static class RuntimeSpriteFactory
     private static Sprite berrySprite;
     private static Sprite wallSprite;
     private static Sprite mineBodySprite;
+    private static Sprite tableSprite;
 
     public static Sprite WhiteSprite
     {
@@ -129,6 +130,19 @@ public static class RuntimeSpriteFactory
             }
 
             return mineBodySprite;
+        }
+    }
+
+    public static Sprite TableSprite
+    {
+        get
+        {
+            if (tableSprite == null)
+            {
+                tableSprite = CreateTableSprite(128);
+            }
+
+            return tableSprite;
         }
     }
 
@@ -392,6 +406,53 @@ public static class RuntimeSpriteFactory
         PaintCircle(texture, new Vector2(size * 0.47f, size * 0.54f), size * 0.03f, new Color(1f, 0.55f, 0.4f, 1f));
         texture.Apply();
         return Sprite.Create(texture, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
+    }
+
+    private static Sprite CreateTableSprite(int size)
+    {
+        var texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        texture.filterMode = FilterMode.Point;
+
+        var baseColorA = new Color32(157, 225, 64, 255);
+        var baseColorB = new Color32(140, 214, 59, 255);
+        var darkGrass = new Color32(30, 129, 40, 255);
+        var lightGrass = new Color32(98, 191, 65, 255);
+        var flowerCore = new Color32(250, 235, 75, 255);
+        var flowerPetal = new Color32(246, 246, 246, 255);
+
+        for (var y = 0; y < size; y++)
+        {
+            for (var x = 0; x < size; x++)
+            {
+                var blend = (Mathf.Sin(x * 0.12f) + Mathf.Sin(y * 0.11f)) * 0.25f + 0.5f;
+                texture.SetPixel(x, y, Color.Lerp(baseColorA, baseColorB, blend));
+            }
+        }
+
+        var random = new System.Random(4183);
+        for (var i = 0; i < 260; i++)
+        {
+            var x = random.Next(2, size - 2);
+            var y = random.Next(2, size - 2);
+            texture.SetPixel(x, y, lightGrass);
+            texture.SetPixel(x + 1, y, darkGrass);
+            texture.SetPixel(x, y + 1, darkGrass);
+        }
+
+        for (var i = 0; i < 90; i++)
+        {
+            var x = random.Next(3, size - 3);
+            var y = random.Next(3, size - 3);
+            texture.SetPixel(x, y, flowerCore);
+            texture.SetPixel(x + 1, y, flowerPetal);
+            texture.SetPixel(x - 1, y, flowerPetal);
+            texture.SetPixel(x, y + 1, flowerPetal);
+            texture.SetPixel(x, y - 1, flowerPetal);
+        }
+
+        texture.wrapMode = TextureWrapMode.Repeat;
+        texture.Apply();
+        return Sprite.Create(texture, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 16f);
     }
 
     private static Texture2D CreateTransparentTexture(int width, int height)

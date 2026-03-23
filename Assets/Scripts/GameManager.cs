@@ -37,6 +37,8 @@ public class GameManager : MonoBehaviour
     [SerializeField] private float snakeSpeed = 2.625f;
     [SerializeField] private float snakeSpeedFactor = 1f;
     [SerializeField] private float snakeSpeedBoostFactor = 1.25f;
+    [SerializeField] private float levelTimerDurationSeconds = 60f;
+    [SerializeField] private float deathMenuDelaySeconds = 1f;
     [SerializeField] private List<LevelConfig> levels = new();
 
     [Header("Arena")]
@@ -52,6 +54,7 @@ public class GameManager : MonoBehaviour
     private SnakeController snakeController;
     private JoystickInput joystickInput;
     private Text levelText;
+    private Text timerText;
     private GameObject levelCompleteMenu;
     private Text levelCompleteText;
     private GameObject nextLevelButton;
@@ -61,6 +64,8 @@ public class GameManager : MonoBehaviour
     private Vector2 currentArenaSize;
     private int currentLevelIndex;
     private bool levelFinished;
+    private float remainingLevelTime;
+    private bool isResultMenuPending;
     private const int TotalLevelCount = 21;
 
     private void Awake()
@@ -73,7 +78,9 @@ public class GameManager : MonoBehaviour
         BuildArena();
         CreateSnake();
         SpawnCurrentLevelBerries();
+        remainingLevelTime = Mathf.Max(0f, levelTimerDurationSeconds);
         UpdateLevelText();
+        UpdateTimerVisual();
     }
 
     private void LateUpdate()
@@ -85,6 +92,21 @@ public class GameManager : MonoBehaviour
 
         var snakePosition = snakeController.transform.position;
         mainCamera.transform.position = new Vector3(snakePosition.x, snakePosition.y, 0f) + cameraOffset;
+    }
+
+    private void Update()
+    {
+        if (levelFinished)
+        {
+            return;
+        }
+
+        remainingLevelTime = Mathf.Max(0f, remainingLevelTime - Time.deltaTime);
+        UpdateTimerVisual();
+        if (remainingLevelTime <= 0f)
+        {
+            HandleTimeExpired();
+        }
     }
 
     private void SetupPortraitOrientation()
@@ -168,6 +190,12 @@ public class GameManager : MonoBehaviour
 
         levelText = CreateText(canvasObject.transform, "LevelText", new Vector2(20f, -20f), new Vector2(420f, 96f), TextAnchor.UpperLeft, 48);
         levelText.color = new Color(1f, 0.95f, 0.2f);
+        timerText = CreateText(canvasObject.transform, "TimerText", new Vector2(-20f, -20f), new Vector2(320f, 96f), TextAnchor.UpperRight, 48);
+        var timerRect = timerText.GetComponent<RectTransform>();
+        timerRect.anchorMin = new Vector2(1f, 1f);
+        timerRect.anchorMax = new Vector2(1f, 1f);
+        timerRect.pivot = new Vector2(1f, 1f);
+        timerText.color = new Color(1f, 0.95f, 0.2f);
 
         levelCompleteMenu = new GameObject("LevelCompleteMenu", typeof(RectTransform), typeof(Image));
         levelCompleteMenu.transform.SetParent(canvasObject.transform, false);
@@ -276,12 +304,13 @@ public class GameManager : MonoBehaviour
 
     public void HandleLose(Vector3 deathPosition, bool spawnExplosion)
     {
-        if (levelFinished)
+        if (levelFinished || isResultMenuPending)
         {
             return;
         }
 
         levelFinished = true;
+        isResultMenuPending = true;
         if (snakeController != null)
         {
             snakeController.gameObject.SetActive(false);
@@ -293,14 +322,16 @@ public class GameManager : MonoBehaviour
             SpawnMineExplosion(deathPosition);
         }
 
-        ShowResultMenu("You died", false);
-        Time.timeScale = 0f;
+        StartCoroutine(ShowResultMenuAfterDelay("You died", false));
     }
 
-    private void RestartCurrentLevel(bool clearSplashes)
+    private void RestartCurrentLevel()
     {
+        StopAllCoroutines();
         Time.timeScale = 1f;
         levelFinished = false;
+        isResultMenuPending = false;
+        remainingLevelTime = Mathf.Max(0f, levelTimerDurationSeconds);
         if (levelCompleteMenu != null)
         {
             levelCompleteMenu.SetActive(false);
@@ -320,15 +351,13 @@ public class GameManager : MonoBehaviour
         }
 
         activeBerries.Clear();
-        if (clearSplashes)
-        {
-            ClearJuiceDroplets();
-        }
+        ClearJuiceDroplets();
 
         CreateSnake();
         BuildArena();
         SpawnCurrentLevelBerries();
         UpdateLevelText();
+        UpdateTimerVisual();
     }
 
     private void SpawnCurrentLevelBerries()
@@ -398,12 +427,12 @@ public class GameManager : MonoBehaviour
         }
 
         currentLevelIndex = (currentLevelIndex + 1) % levels.Count;
-        RestartCurrentLevel(clearSplashes: true);
+        RestartCurrentLevel();
     }
 
     private void HandleRetryPressed()
     {
-        RestartCurrentLevel(clearSplashes: false);
+        RestartCurrentLevel();
     }
 
     private void UpdateLevelText()
@@ -702,8 +731,8 @@ public class GameManager : MonoBehaviour
         background.transform.localScale = new Vector3(currentArenaSize.x, currentArenaSize.y, 1f);
 
         var renderer = background.GetComponent<SpriteRenderer>();
-        renderer.sprite = RuntimeSpriteFactory.WhiteSprite;
-        renderer.color = new Color(0.11f, 0.16f, 0.13f, 1f);
+        renderer.sprite = RuntimeSpriteFactory.TableSprite;
+        renderer.color = Color.white;
         renderer.sortingOrder = -1;
     }
 
@@ -782,6 +811,56 @@ public class GameManager : MonoBehaviour
         }
 
         levelCompleteMenu.SetActive(true);
+    }
+
+    private IEnumerator ShowResultMenuAfterDelay(string resultText, bool showNextLevelButton)
+    {
+        yield return new WaitForSeconds(deathMenuDelaySeconds);
+        ShowResultMenu(resultText, showNextLevelButton);
+        Time.timeScale = 0f;
+        isResultMenuPending = false;
+    }
+
+    private void HandleTimeExpired()
+    {
+        if (levelFinished || isResultMenuPending)
+        {
+            return;
+        }
+
+        levelFinished = true;
+        isResultMenuPending = true;
+        if (snakeController != null)
+        {
+            snakeController.gameObject.SetActive(false);
+        }
+
+        StartCoroutine(ShowResultMenuAfterDelay("time left", false));
+    }
+
+    private void UpdateTimerVisual()
+    {
+        if (timerText == null)
+        {
+            return;
+        }
+
+        var seconds = Mathf.CeilToInt(remainingLevelTime);
+        var minutesPart = seconds / 60;
+        var secondsPart = seconds % 60;
+        timerText.text = $"{minutesPart:00}:{secondsPart:00}";
+
+        if (remainingLevelTime <= 10f)
+        {
+            var pulse = 1f + 0.12f * (0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 10f));
+            timerText.transform.localScale = new Vector3(pulse, pulse, 1f);
+            timerText.color = Color.red;
+        }
+        else
+        {
+            timerText.transform.localScale = Vector3.one;
+            timerText.color = new Color(1f, 0.95f, 0.2f);
+        }
     }
 
     private void SpawnSnakeDeathJuice(Vector3 deathPosition)
