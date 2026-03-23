@@ -14,6 +14,9 @@ public class GameManager : MonoBehaviour
     [Header("Arena")]
     [SerializeField] private Vector2 arenaSize = new(8f, 12f);
     [SerializeField] private float wallThickness = 0.4f;
+    [SerializeField] private float cameraHeightFactor = 0.4f;
+    [SerializeField] private float minimumCameraSize = 4.5f;
+    [SerializeField] private Vector3 cameraOffset = new(0f, 0f, -10f);
 
     private readonly List<Vector2> initialBerryPositions = new();
     private readonly List<Berry> activeBerries = new();
@@ -21,16 +24,29 @@ public class GameManager : MonoBehaviour
     private SnakeController snakeController;
     private JoystickInput joystickInput;
     private Text winText;
+    private Camera mainCamera;
     private bool levelFinished;
 
     private void Awake()
     {
+        Time.timeScale = 1f;
         SetupPortraitOrientation();
         SetupCamera();
         SetupUi();
         BuildArena();
         CreateSnake();
         CreateOrRestoreBerries(useStoredPositions: false);
+    }
+
+    private void LateUpdate()
+    {
+        if (mainCamera == null || snakeController == null || levelFinished)
+        {
+            return;
+        }
+
+        var snakePosition = snakeController.transform.position;
+        mainCamera.transform.position = new Vector3(snakePosition.x, snakePosition.y, 0f) + cameraOffset;
     }
 
     private void SetupPortraitOrientation()
@@ -44,16 +60,16 @@ public class GameManager : MonoBehaviour
 
     private void SetupCamera()
     {
-        var cam = Camera.main;
-        if (cam == null)
+        mainCamera = Camera.main;
+        if (mainCamera == null)
         {
             return;
         }
 
-        cam.orthographic = true;
-        cam.orthographicSize = Mathf.Max(arenaSize.y * 0.55f, 6.5f);
-        cam.transform.position = new Vector3(0f, 0f, -10f);
-        cam.backgroundColor = new Color(0.08f, 0.08f, 0.11f);
+        mainCamera.orthographic = true;
+        mainCamera.orthographicSize = Mathf.Max(arenaSize.y * cameraHeightFactor, minimumCameraSize);
+        mainCamera.transform.position = cameraOffset;
+        mainCamera.backgroundColor = new Color(0.08f, 0.08f, 0.11f);
     }
 
     private void SetupUi()
@@ -158,6 +174,7 @@ public class GameManager : MonoBehaviour
         {
             levelFinished = true;
             winText.text = "you win";
+            Time.timeScale = 0f;
         }
     }
 
@@ -173,6 +190,7 @@ public class GameManager : MonoBehaviour
 
     private void RestartLevel()
     {
+        Time.timeScale = 1f;
         levelFinished = false;
         winText.text = string.Empty;
 
