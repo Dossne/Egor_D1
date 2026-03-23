@@ -55,7 +55,7 @@ public class GameManager : MonoBehaviour
     [SerializeField] private int startSnakeLength = 5;
     [SerializeField] private int growthPerBerry = 3;
     [FormerlySerializedAs("snakeSpeed")]
-    [SerializeField] private float snakeSpeed = 2.625f;
+    [SerializeField] private float snakeSpeed = 2.23125f;
     [SerializeField] private float snakeSpeedFactor = 1f;
     [SerializeField] private float snakeSpeedBoostFactor = 1.25f;
     [SerializeField] private float levelTimerDurationSeconds = 40f;
@@ -396,7 +396,6 @@ public class GameManager : MonoBehaviour
 
         if (activeBerries.Remove(berry))
         {
-            PlaySound(berryEatSound);
             Destroy(berry.gameObject);
         }
 
@@ -1667,11 +1666,8 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        failureAudioSource.loop = false;
-        failureAudioSource.clip = config.clip;
-        failureAudioSource.volume = config.volume;
         failureAudioSource.pitch = config.pitch;
-        failureAudioSource.Play();
+        failureAudioSource.PlayOneShot(config.clip, config.volume);
     }
 
     private void StopFailureSound()
@@ -1680,6 +1676,11 @@ public class GameManager : MonoBehaviour
         {
             failureAudioSource.Stop();
         }
+    }
+
+    public void PlayBerryEatSound()
+    {
+        PlaySound(berryEatSound);
     }
 
     private void StopBackgroundMusic()
