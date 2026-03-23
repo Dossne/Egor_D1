@@ -5,6 +5,7 @@ using UnityEngine;
 public class SnakeController : MonoBehaviour
 {
     [SerializeField] private float moveSpeed = 3.5f;
+    [SerializeField] private float turnSpeedDegreesPerSecond = 180f;
 
     private Rigidbody2D rb;
     private SnakeBody snakeBody;
@@ -57,7 +58,9 @@ public class SnakeController : MonoBehaviour
         var input = joystickInput != null ? joystickInput.InputVector : Vector2.zero;
         if (input.sqrMagnitude > 0.01f)
         {
-            currentDirection = input.normalized;
+            var targetDirection = input.normalized;
+            var maxRadiansDelta = turnSpeedDegreesPerSecond * Mathf.Deg2Rad * Time.fixedDeltaTime;
+            currentDirection = Vector2.RotateTowards(currentDirection, targetDirection, maxRadiansDelta, 0f).normalized;
         }
 
         rb.velocity = currentDirection * moveSpeed;
