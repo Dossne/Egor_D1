@@ -11,6 +11,23 @@ public class GameManager : MonoBehaviour
     private class LevelConfig
     {
         public List<Vector2> berryPositions = new();
+        public List<ObstacleConfig> obstacles = new();
+    }
+
+    [System.Serializable]
+    private class ObstacleConfig
+    {
+        public ObstacleType type;
+        public Vector2 position;
+        public float radius;
+        public float length;
+        public bool horizontal;
+    }
+
+    private enum ObstacleType
+    {
+        Pillar = 0,
+        Line = 1
     }
 
     [Header("Game Rules")]
@@ -18,7 +35,8 @@ public class GameManager : MonoBehaviour
     [SerializeField] private int growthPerBerry = 3;
     [FormerlySerializedAs("snakeSpeed")]
     [SerializeField] private float snakeSpeed = 2.625f;
-    [SerializeField] private float snakeSpeedFactor = 0.75f;
+    [SerializeField] private float snakeSpeedFactor = 1f;
+    [SerializeField] private float snakeSpeedBoostFactor = 1.25f;
     [SerializeField] private List<LevelConfig> levels = new();
 
     [Header("Arena")]
@@ -27,7 +45,7 @@ public class GameManager : MonoBehaviour
     [SerializeField] private float wallThickness = 0.4f;
     [SerializeField] private float cameraHeightFactor = 0.4f;
     [SerializeField] private float minimumCameraSize = 4.5f;
-    [SerializeField] private float cameraZoomOutFactor = 1.2f;
+    [SerializeField] private float cameraZoomOutFactor = 1.35f;
     [SerializeField] private Vector3 cameraOffset = new(0f, 0f, -10f);
 
     private readonly List<Berry> activeBerries = new();
@@ -44,6 +62,7 @@ public class GameManager : MonoBehaviour
     private Vector2 currentArenaSize;
     private int currentLevelIndex;
     private bool levelFinished;
+    private const int TotalLevelCount = 21;
 
     private void Awake()
     {
@@ -200,6 +219,7 @@ public class GameManager : MonoBehaviour
         CreateLaserCorner("TopRightCorner", new Vector2(rightPosition.x, topPosition.y));
         CreateLaserCorner("BottomLeftCorner", new Vector2(leftPosition.x, bottomPosition.y));
         CreateLaserCorner("BottomRightCorner", new Vector2(rightPosition.x, bottomPosition.y));
+        CreateLevelObstacles();
         ApplyCameraSizeForCurrentArena();
     }
 
@@ -209,7 +229,7 @@ public class GameManager : MonoBehaviour
         snakeObject.transform.position = Vector3.zero;
 
         snakeController = snakeObject.GetComponent<SnakeController>();
-        snakeController.Setup(this, joystickInput, startSnakeLength, snakeSpeed * snakeSpeedFactor);
+        snakeController.Setup(this, joystickInput, startSnakeLength, snakeSpeed * snakeSpeedFactor * snakeSpeedBoostFactor);
     }
 
     public void HandleBerryCollected(Berry berry)
@@ -322,20 +342,41 @@ public class GameManager : MonoBehaviour
 
     private void EnsureLevelsConfigured()
     {
-        if (levels.Count > 0)
+        if (levels.Count == 0)
         {
-            EnsureLevelArenaScales();
-            return;
+            levels = new List<LevelConfig>
+            {
+                new() { berryPositions = new List<Vector2> { new(-2.6f, -2.2f), new(0.3f, 1.6f), new(2.3f, 3.1f) } }
+            };
         }
 
-        levels = new List<LevelConfig>
+        if (levels.Count < TotalLevelCount)
         {
-            new() { berryPositions = new List<Vector2> { new(-2.6f, -2.2f), new(0.3f, 1.6f), new(2.3f, 3.1f) } },
-            new() { berryPositions = new List<Vector2> { new(-2.2f, 2.8f), new(2.2f, 2.2f), new(0f, -1.9f), new(1.5f, -3.4f) } },
-            new() { berryPositions = new List<Vector2> { new(-2.7f, 0.5f), new(-0.2f, 3f), new(2.5f, 0.8f), new(-1.4f, -2.9f), new(1.6f, -3.2f) } }
-        };
+            for (var i = levels.Count; i < TotalLevelCount; i++)
+            {
+                levels.Add(new LevelConfig());
+            }
+        }
+
+        EnsureProceduralLevelContent();
 
         EnsureLevelArenaScales();
+    }
+
+    private void EnsureProceduralLevelContent()
+    {
+        for (var i = 1; i < levels.Count; i++)
+        {
+            if (levels[i].berryPositions.Count < 4 || levels[i].berryPositions.Count > 6)
+            {
+                levels[i].berryPositions = GenerateBerryPositionsForLevel(i);
+            }
+
+            if (levels[i].obstacles == null || levels[i].obstacles.Count == 0)
+            {
+                levels[i].obstacles = GenerateObstaclesForLevel(i);
+            }
+        }
     }
 
     private void HandleNextLevelPressed()
@@ -408,6 +449,11 @@ public class GameManager : MonoBehaviour
         var targetPosition = startPosition + (Vector3)offset;
         while (elapsed < duration)
         {
+            if (dropletTransform == null)
+            {
+                yield break;
+            }
+
             elapsed += Time.deltaTime;
             var t = Mathf.Clamp01(elapsed / duration);
             var easeOut = 1f - (1f - t) * (1f - t);
@@ -415,10 +461,194 @@ public class GameManager : MonoBehaviour
             yield return null;
         }
 
-        if (droplet != null)
+        if (dropletTransform != null)
         {
             dropletTransform.position = targetPosition;
         }
+    }
+
+    private void CreateLevelObstacles()
+    {
+        if (currentLevelIndex <= 0 || levels.Count == 0)
+        {
+            return;
+        }
+
+        var level = levels[Mathf.Clamp(currentLevelIndex, 0, levels.Count - 1)];
+        var levelScale = GetArenaScaleForLevel(currentLevelIndex);
+        if (level.obstacles == null)
+        {
+            return;
+        }
+
+        for (var i = 0; i < level.obstacles.Count; i++)
+        {
+            var obstacle = level.obstacles[i];
+            if (obstacle.type == ObstacleType.Pillar)
+            {
+                CreatePillarObstacle($"Pillar_{i + 1}", obstacle.position * levelScale, obstacle.radius * levelScale);
+            }
+            else
+            {
+                CreateLineObstacle($"Line_{i + 1}", obstacle.position * levelScale, obstacle.length * levelScale, obstacle.horizontal);
+            }
+        }
+    }
+
+    private void CreatePillarObstacle(string name, Vector2 position, float radius)
+    {
+        var pillar = new GameObject(name, typeof(SpriteRenderer), typeof(CircleCollider2D), typeof(WallCollision));
+        pillar.transform.SetParent(arenaRoot, true);
+        pillar.transform.position = position;
+        var diameter = radius * 2f;
+        pillar.transform.localScale = new Vector3(diameter, diameter, 1f);
+
+        var renderer = pillar.GetComponent<SpriteRenderer>();
+        renderer.sprite = RuntimeSpriteFactory.CircleSprite;
+        renderer.color = Color.white;
+        renderer.sortingOrder = 3;
+
+        var collider = pillar.GetComponent<CircleCollider2D>();
+        collider.isTrigger = true;
+        collider.radius = 0.5f;
+
+        var glow = new GameObject("Glow", typeof(SpriteRenderer));
+        glow.transform.SetParent(pillar.transform, false);
+        glow.transform.localScale = new Vector3(1.6f, 1.6f, 1f);
+        var glowRenderer = glow.GetComponent<SpriteRenderer>();
+        glowRenderer.sprite = RuntimeSpriteFactory.CircleSprite;
+        glowRenderer.color = new Color(1f, 0.12f, 0.12f, 0.42f);
+        glowRenderer.sortingOrder = 2;
+    }
+
+    private void CreateLineObstacle(string name, Vector2 position, float length, bool horizontal)
+    {
+        var size = horizontal ? new Vector2(length, wallThickness) : new Vector2(wallThickness, length);
+        CreateWall(name, position, size);
+    }
+
+    private List<Vector2> GenerateBerryPositionsForLevel(int levelIndex)
+    {
+        var random = new System.Random(7021 + levelIndex * 37);
+        var berryCount = random.Next(4, 7);
+        var positions = new List<Vector2>(berryCount);
+        var minDistance = 1.8f;
+        var maxDistanceFromCenter = 4.2f;
+
+        while (positions.Count < berryCount)
+        {
+            var candidate = new Vector2(
+                Mathf.Lerp(-maxDistanceFromCenter, maxDistanceFromCenter, (float)random.NextDouble()),
+                Mathf.Lerp(-maxDistanceFromCenter, maxDistanceFromCenter, (float)random.NextDouble()));
+
+            if (candidate.magnitude < 1.4f)
+            {
+                continue;
+            }
+
+            var isFarEnough = true;
+            for (var i = 0; i < positions.Count; i++)
+            {
+                if (Vector2.Distance(candidate, positions[i]) < minDistance)
+                {
+                    isFarEnough = false;
+                    break;
+                }
+            }
+
+            if (isFarEnough)
+            {
+                positions.Add(candidate);
+            }
+        }
+
+        return positions;
+    }
+
+    private List<ObstacleConfig> GenerateObstaclesForLevel(int levelIndex)
+    {
+        var random = new System.Random(9901 + levelIndex * 53);
+        var obstacles = new List<ObstacleConfig>();
+        var pattern = (levelIndex - 1) % 5;
+
+        var pillarCount = pattern == 0 ? 4 : random.Next(2, 5);
+        var lineCount = pattern == 1 ? 2 : random.Next(1, 3);
+        if (pattern == 2)
+        {
+            pillarCount = 3;
+            lineCount = 1;
+        }
+        else if (pattern == 3)
+        {
+            pillarCount = 2;
+            lineCount = 2;
+        }
+        else if (pattern == 4)
+        {
+            pillarCount = 5;
+            lineCount = 1;
+        }
+
+        for (var i = 0; i < pillarCount; i++)
+        {
+            obstacles.Add(new ObstacleConfig
+            {
+                type = ObstacleType.Pillar,
+                position = CreateObstaclePosition(random, obstacles),
+                radius = Mathf.Lerp(0.3f, 0.48f, (float)random.NextDouble())
+            });
+        }
+
+        for (var i = 0; i < lineCount; i++)
+        {
+            obstacles.Add(new ObstacleConfig
+            {
+                type = ObstacleType.Line,
+                position = CreateObstaclePosition(random, obstacles),
+                length = Mathf.Lerp(2.4f, 4.8f, (float)random.NextDouble()),
+                horizontal = random.NextDouble() > 0.5
+            });
+        }
+
+        return obstacles;
+    }
+
+    private Vector2 CreateObstaclePosition(System.Random random, List<ObstacleConfig> existingObstacles)
+    {
+        const float minRange = 1.3f;
+        const float maxRange = 3.8f;
+        const float minDistanceFromOtherObstacles = 1.3f;
+        Vector2 candidate = Vector2.zero;
+        var attempts = 0;
+        while (attempts < 50)
+        {
+            attempts++;
+            candidate = new Vector2(
+                Mathf.Lerp(-maxRange, maxRange, (float)random.NextDouble()),
+                Mathf.Lerp(-maxRange, maxRange, (float)random.NextDouble()));
+
+            if (candidate.magnitude < minRange)
+            {
+                continue;
+            }
+
+            var farEnough = true;
+            for (var i = 0; i < existingObstacles.Count; i++)
+            {
+                if (Vector2.Distance(candidate, existingObstacles[i].position) < minDistanceFromOtherObstacles)
+                {
+                    farEnough = false;
+                    break;
+                }
+            }
+
+            if (farEnough)
+            {
+                break;
+            }
+        }
+
+        return candidate;
     }
 
     private void ClearJuiceDroplets()
