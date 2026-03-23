@@ -453,20 +453,25 @@ public static class RuntimeSpriteFactory
             texture.SetPixel(x, y + 1, darkGrass);
         }
 
-        for (var i = 0; i < 90; i++)
+        for (var i = 0; i < 160; i++)
         {
-            var x = random.Next(3, size - 3);
-            var y = random.Next(3, size - 3);
+            var x = random.Next(2, size - 2);
+            var y = random.Next(2, size - 2);
             texture.SetPixel(x, y, flowerCore);
-            texture.SetPixel(x + 1, y, flowerPetal);
-            texture.SetPixel(x - 1, y, flowerPetal);
-            texture.SetPixel(x, y + 1, flowerPetal);
-            texture.SetPixel(x, y - 1, flowerPetal);
+            if (random.NextDouble() > 0.45d)
+            {
+                texture.SetPixel(x + 1, y, flowerPetal);
+            }
+
+            if (random.NextDouble() > 0.45d)
+            {
+                texture.SetPixel(x, y + 1, flowerPetal);
+            }
         }
 
         texture.wrapMode = TextureWrapMode.Repeat;
         texture.Apply();
-        return Sprite.Create(texture, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 16f);
+        return Sprite.Create(texture, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 32f);
     }
 
     private static Sprite CreateSpikeSprite(int width, int height)

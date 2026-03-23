@@ -13,6 +13,7 @@ public class SpikePlatform : MonoBehaviour
     private readonly List<Transform> spikeTransforms = new();
     private readonly List<Vector3> spikeLoweredPositions = new();
     private readonly HashSet<SnakeController> snakesInside = new();
+    private readonly List<SnakeController> snakesInsideSnapshot = new();
     private SpriteRenderer baseRenderer;
     private bool spikesExtended;
 
@@ -56,8 +57,11 @@ public class SpikePlatform : MonoBehaviour
             return;
         }
 
-        foreach (var snake in snakesInside)
+        snakesInsideSnapshot.Clear();
+        snakesInsideSnapshot.AddRange(snakesInside);
+        for (var i = 0; i < snakesInsideSnapshot.Count; i++)
         {
+            var snake = snakesInsideSnapshot[i];
             if (snake != null)
             {
                 snake.Kill(false);

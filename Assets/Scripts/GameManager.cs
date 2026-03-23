@@ -56,6 +56,12 @@ public class GameManager : MonoBehaviour
     [SerializeField] private float fixedCameraSize = 6.4f;
     [SerializeField] private Vector3 cameraOffset = new(0f, 0f, -10f);
 
+    [Header("UI Style (GUI Pro - Fantasy RPG)")]
+    [SerializeField] private Font uiFont;
+    [SerializeField] private Sprite uiPopupSprite;
+    [SerializeField] private Sprite uiButtonSprite;
+    [SerializeField] private Sprite uiJoystickSprite;
+
     private readonly List<Berry> activeBerries = new();
     private readonly List<GameObject> activeJuiceDroplets = new();
     private readonly List<Vector2> currentMinePositions = new();
@@ -81,6 +87,9 @@ public class GameManager : MonoBehaviour
     private const float BerryRadius = 0.372f;
     private const float BerryWallClearance = 0.2f;
     private const float BerryMineClearance = 0.15f;
+    private readonly Color timerDefaultColor = new(1f, 0.95f, 0.2f);
+    private readonly Color titleTextColor = new(0.97f, 0.91f, 0.68f);
+    private readonly Color bodyTextColor = new(0.96f, 0.93f, 0.82f);
 
     private void Awake()
     {
@@ -182,8 +191,8 @@ public class GameManager : MonoBehaviour
         joystickRect.sizeDelta = new Vector2(220f, 220f);
 
         var joystickBg = joystickRoot.GetComponent<Image>();
-        joystickBg.color = new Color(1f, 1f, 1f, 0.18f);
-        joystickBg.sprite = RuntimeSpriteFactory.CircleSprite;
+        joystickBg.color = new Color(1f, 1f, 1f, 0.8f);
+        joystickBg.sprite = uiJoystickSprite != null ? uiJoystickSprite : RuntimeSpriteFactory.CircleSprite;
         joystickBg.type = Image.Type.Simple;
         joystickBg.preserveAspect = true;
         joystickBg.raycastTarget = false;
@@ -191,10 +200,10 @@ public class GameManager : MonoBehaviour
         var handleObject = new GameObject("Handle", typeof(RectTransform), typeof(Image));
         handleObject.transform.SetParent(joystickRoot.transform, false);
         var handleRect = handleObject.GetComponent<RectTransform>();
-        handleRect.sizeDelta = new Vector2(90f, 90f);
+        handleRect.sizeDelta = new Vector2(94f, 94f);
         var handleImage = handleObject.GetComponent<Image>();
-        handleImage.sprite = RuntimeSpriteFactory.CircleSprite;
-        handleImage.color = new Color(1f, 1f, 1f, 0.55f);
+        handleImage.sprite = uiButtonSprite != null ? uiButtonSprite : RuntimeSpriteFactory.CircleSprite;
+        handleImage.color = new Color(1f, 1f, 1f, 0.88f);
         handleImage.type = Image.Type.Simple;
         handleImage.preserveAspect = true;
         handleImage.raycastTarget = false;
@@ -203,13 +212,13 @@ public class GameManager : MonoBehaviour
         joystickInput.SetReferences(joystickRect, handleRect);
 
         levelText = CreateText(canvasObject.transform, "LevelText", new Vector2(20f, -20f), new Vector2(420f, 96f), TextAnchor.UpperLeft, 48);
-        levelText.color = new Color(1f, 0.95f, 0.2f);
+        levelText.color = titleTextColor;
         timerText = CreateText(canvasObject.transform, "TimerText", new Vector2(0f, -24f), new Vector2(420f, 132f), TextAnchor.UpperCenter, 72);
         var timerRect = timerText.GetComponent<RectTransform>();
         timerRect.anchorMin = new Vector2(0.5f, 1f);
         timerRect.anchorMax = new Vector2(0.5f, 1f);
         timerRect.pivot = new Vector2(0.5f, 1f);
-        timerText.color = new Color(1f, 0.95f, 0.2f);
+        timerText.color = timerDefaultColor;
 
         levelCompleteMenu = new GameObject("LevelCompleteMenu", typeof(RectTransform), typeof(Image));
         levelCompleteMenu.transform.SetParent(canvasObject.transform, false);
@@ -219,7 +228,11 @@ public class GameManager : MonoBehaviour
         menuRect.pivot = new Vector2(0.5f, 0.5f);
         menuRect.sizeDelta = new Vector2(700f, 420f);
         var menuBackground = levelCompleteMenu.GetComponent<Image>();
-        menuBackground.color = new Color(0.05f, 0.08f, 0.11f, 0.92f);
+        menuBackground.sprite = uiPopupSprite;
+        menuBackground.type = uiPopupSprite != null ? Image.Type.Sliced : Image.Type.Simple;
+        menuBackground.color = uiPopupSprite != null
+            ? Color.white
+            : new Color(0.08f, 0.1f, 0.16f, 0.95f);
 
         levelCompleteText = CreateText(levelCompleteMenu.transform, "LevelCompleteText", new Vector2(0f, 130f), new Vector2(640f, 120f), TextAnchor.MiddleCenter, 72);
         var levelCompleteRect = levelCompleteText.GetComponent<RectTransform>();
@@ -227,7 +240,7 @@ public class GameManager : MonoBehaviour
         levelCompleteRect.anchorMax = new Vector2(0.5f, 0.5f);
         levelCompleteRect.pivot = new Vector2(0.5f, 0.5f);
         levelCompleteRect.anchoredPosition = new Vector2(0f, 130f);
-        levelCompleteText.color = new Color(1f, 0.95f, 0.2f);
+        levelCompleteText.color = titleTextColor;
         levelCompleteText.text = "level complete";
 
         levelStarsText = CreateText(levelCompleteMenu.transform, "LevelStarsText", new Vector2(0f, 220f), new Vector2(680f, 140f), TextAnchor.MiddleCenter, 120);
@@ -236,7 +249,7 @@ public class GameManager : MonoBehaviour
         starsRect.anchorMax = new Vector2(0.5f, 0.5f);
         starsRect.pivot = new Vector2(0.5f, 0.5f);
         starsRect.anchoredPosition = new Vector2(0f, 230f);
-        levelStarsText.color = new Color(1f, 0.86f, 0.22f, 1f);
+        levelStarsText.color = new Color(1f, 0.87f, 0.26f, 1f);
         levelStarsText.text = string.Empty;
 
         nextLevelButton = CreateMenuButton(levelCompleteMenu.transform, "NextLevelButton", "next level", new Vector2(0f, 10f), HandleNextLevelPressed);
@@ -1029,10 +1042,12 @@ public class GameManager : MonoBehaviour
         var background = new GameObject("ArenaBackground", typeof(SpriteRenderer));
         background.transform.SetParent(arenaRoot, true);
         background.transform.position = Vector3.zero;
-        background.transform.localScale = new Vector3(currentArenaSize.x, currentArenaSize.y, 1f);
+        background.transform.localScale = Vector3.one;
 
         var renderer = background.GetComponent<SpriteRenderer>();
         renderer.sprite = RuntimeSpriteFactory.TableSprite;
+        renderer.drawMode = SpriteDrawMode.Tiled;
+        renderer.size = currentArenaSize;
         renderer.color = Color.white;
         renderer.sortingOrder = -1;
     }
@@ -1079,7 +1094,7 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    private static Text CreateText(Transform parent, string objectName, Vector2 anchoredPosition, Vector2 size, TextAnchor alignment, int fontSize)
+    private Text CreateText(Transform parent, string objectName, Vector2 anchoredPosition, Vector2 size, TextAnchor alignment, int fontSize)
     {
         var textObject = new GameObject(objectName, typeof(RectTransform), typeof(Text));
         textObject.transform.SetParent(parent, false);
@@ -1091,7 +1106,11 @@ public class GameManager : MonoBehaviour
         textRect.sizeDelta = size;
 
         var text = textObject.GetComponent<Text>();
-        text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        text.font = uiFont != null ? uiFont : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        text.supportRichText = false;
+        text.horizontalOverflow = HorizontalWrapMode.Wrap;
+        text.verticalOverflow = VerticalWrapMode.Overflow;
+        text.fontStyle = FontStyle.Bold;
         text.fontSize = fontSize;
         text.alignment = alignment;
         text.text = string.Empty;
@@ -1165,7 +1184,7 @@ public class GameManager : MonoBehaviour
         else
         {
             timerText.transform.localScale = Vector3.one;
-            timerText.color = new Color(1f, 0.95f, 0.2f);
+            timerText.color = timerDefaultColor;
         }
     }
 
@@ -1245,7 +1264,7 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    private static GameObject CreateMenuButton(Transform parent, string name, string label, Vector2 anchoredPosition, UnityEngine.Events.UnityAction callback)
+    private GameObject CreateMenuButton(Transform parent, string name, string label, Vector2 anchoredPosition, UnityEngine.Events.UnityAction callback)
     {
         var buttonObject = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
         buttonObject.transform.SetParent(parent, false);
@@ -1258,10 +1277,26 @@ public class GameManager : MonoBehaviour
         buttonRect.sizeDelta = new Vector2(420f, 92f);
 
         var buttonImage = buttonObject.GetComponent<Image>();
-        buttonImage.color = new Color(0.2f, 0.45f, 0.24f, 0.95f);
+        buttonImage.sprite = uiButtonSprite;
+        buttonImage.type = uiButtonSprite != null ? Image.Type.Sliced : Image.Type.Simple;
+        buttonImage.color = uiButtonSprite != null
+            ? Color.white
+            : new Color(0.24f, 0.36f, 0.18f, 0.97f);
 
         var button = buttonObject.GetComponent<Button>();
         button.onClick.AddListener(callback);
+        button.transition = Selectable.Transition.ColorTint;
+        button.targetGraphic = buttonImage;
+        button.colors = new ColorBlock
+        {
+            normalColor = Color.white,
+            highlightedColor = new Color(1f, 0.95f, 0.84f, 1f),
+            pressedColor = new Color(0.88f, 0.82f, 0.72f, 1f),
+            selectedColor = new Color(1f, 0.95f, 0.84f, 1f),
+            disabledColor = new Color(0.6f, 0.6f, 0.6f, 0.65f),
+            colorMultiplier = 1f,
+            fadeDuration = 0.08f
+        };
 
         var text = CreateText(buttonObject.transform, "Label", new Vector2(0f, 0f), new Vector2(420f, 92f), TextAnchor.MiddleCenter, 44);
         var textRect = text.GetComponent<RectTransform>();
@@ -1269,7 +1304,7 @@ public class GameManager : MonoBehaviour
         textRect.anchorMax = new Vector2(0.5f, 0.5f);
         textRect.pivot = new Vector2(0.5f, 0.5f);
         textRect.anchoredPosition = Vector2.zero;
-        text.color = Color.white;
+        text.color = bodyTextColor;
         text.text = label;
         return buttonObject;
     }
