@@ -11,6 +11,9 @@ public class SnakeController : MonoBehaviour
     private JoystickInput joystickInput;
     private GameManager gameManager;
     private Vector2 currentDirection = Vector2.right;
+    private Vector2 previousPosition;
+    private float movedDistance;
+    private bool selfCollisionEnabled;
     private bool isAlive;
 
     public void Setup(GameManager manager, JoystickInput joystick, int startLength, float speed)
@@ -37,6 +40,9 @@ public class SnakeController : MonoBehaviour
         snakeBody.Initialize(transform, Mathf.Max(0, startLength - 1), transform.parent);
 
         currentDirection = Vector2.right;
+        previousPosition = rb.position;
+        movedDistance = 0f;
+        selfCollisionEnabled = false;
         isAlive = true;
     }
 
@@ -55,6 +61,13 @@ public class SnakeController : MonoBehaviour
         }
 
         rb.velocity = currentDirection * moveSpeed;
+        movedDistance += Vector2.Distance(previousPosition, rb.position);
+        previousPosition = rb.position;
+
+        if (!selfCollisionEnabled && movedDistance >= snakeBody.SegmentSpacing * 2f)
+        {
+            selfCollisionEnabled = true;
+        }
 
         if (currentDirection.sqrMagnitude > 0.001f)
         {
@@ -94,7 +107,7 @@ public class SnakeController : MonoBehaviour
             return;
         }
 
-        if (snakeBody != null)
+        if (selfCollisionEnabled && snakeBody != null)
         {
             var segments = snakeBody.Segments;
             for (var i = 1; i < segments.Count; i++)

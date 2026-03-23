@@ -3,13 +3,14 @@ using UnityEngine;
 
 public class SnakeBody : MonoBehaviour
 {
-    [SerializeField] private float segmentSpacing = 0.45f;
+    [SerializeField] private float segmentSpacing = 0.65f;
 
     private readonly List<Transform> segments = new();
     private readonly List<Vector3> movementHistory = new();
     private Transform segmentRoot;
 
     public IReadOnlyList<Transform> Segments => segments;
+    public float SegmentSpacing => segmentSpacing;
 
     public void Initialize(Transform head, int initialBodySegments, Transform root)
     {
