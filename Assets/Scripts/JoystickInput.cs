@@ -19,6 +19,7 @@ public class JoystickInput : MonoBehaviour, IPointerDownHandler, IDragHandler, I
     {
         background = backgroundRect;
         handle = handleRect;
+        SetBackgroundVisible(false);
     }
 
     private void Awake()

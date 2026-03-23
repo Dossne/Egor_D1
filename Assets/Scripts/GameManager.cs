@@ -224,7 +224,7 @@ public class GameManager : MonoBehaviour
         joystickRect.sizeDelta = new Vector2(236f, 236f);
 
         var joystickBg = joystickRoot.GetComponent<Image>();
-        joystickBg.color = new Color(1f, 1f, 1f, 0.78f);
+        joystickBg.color = new Color(1f, 1f, 1f, 0.35f);
         joystickBg.sprite = uiJoystickSprite != null ? uiJoystickSprite : RuntimeSpriteFactory.CircleSprite;
         joystickBg.type = uiJoystickSprite != null ? Image.Type.Sliced : Image.Type.Simple;
         joystickBg.preserveAspect = uiJoystickSprite == null;
@@ -236,7 +236,7 @@ public class GameManager : MonoBehaviour
         handleRect.sizeDelta = new Vector2(102f, 102f);
         var handleImage = handleObject.GetComponent<Image>();
         handleImage.sprite = uiButtonSprite != null ? uiButtonSprite : RuntimeSpriteFactory.CircleSprite;
-        handleImage.color = new Color(1f, 1f, 1f, 0.93f);
+        handleImage.color = new Color(1f, 1f, 1f, 0.5f);
         handleImage.type = uiButtonSprite != null ? Image.Type.Sliced : Image.Type.Simple;
         handleImage.preserveAspect = uiButtonSprite == null;
         handleImage.raycastTarget = false;
@@ -1393,11 +1393,19 @@ public class GameManager : MonoBehaviour
         var secondsPart = seconds % 60;
         timerText.text = $"{minutesPart:00}:{secondsPart:00}";
 
-        if (remainingLevelTime <= 10f)
+        if (remainingLevelTime <= 19f)
         {
-            var pulse = 1f + 0.12f * (0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 10f));
-            timerText.transform.localScale = new Vector3(pulse, pulse, 1f);
             timerText.color = Color.red;
+
+            if (remainingLevelTime <= 10f)
+            {
+                var pulse = 1f + 0.12f * (0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 10f));
+                timerText.transform.localScale = new Vector3(pulse, pulse, 1f);
+            }
+            else
+            {
+                timerText.transform.localScale = Vector3.one;
+            }
         }
         else
         {
