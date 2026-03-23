@@ -17,7 +17,8 @@ public class Berry : MonoBehaviour
         var renderer = GetComponent<SpriteRenderer>();
         renderer.sprite = RuntimeSpriteFactory.WhiteSprite;
         renderer.color = new Color(0.9f, 0.15f, 0.2f);
-        transform.localScale = new Vector3(0.32f, 0.32f, 1f);
+        renderer.sortingOrder = 5;
+        transform.localScale = new Vector3(0.52f, 0.52f, 1f);
 
         CreateEye("EyeLeft", new Vector3(-0.06f, 0.05f, 0f));
         CreateEye("EyeRight", new Vector3(0.06f, 0.05f, 0f));

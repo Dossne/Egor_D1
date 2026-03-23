@@ -114,6 +114,7 @@ public class GameManager : MonoBehaviour
 
     private void BuildArena()
     {
+        CreateArenaBackground();
         CreateWall("TopWall", new Vector2(0f, arenaSize.y * 0.5f + wallThickness * 0.5f), new Vector2(arenaSize.x + wallThickness * 2f, wallThickness));
         CreateWall("BottomWall", new Vector2(0f, -arenaSize.y * 0.5f - wallThickness * 0.5f), new Vector2(arenaSize.x + wallThickness * 2f, wallThickness));
         CreateWall("LeftWall", new Vector2(-arenaSize.x * 0.5f - wallThickness * 0.5f, 0f), new Vector2(wallThickness, arenaSize.y));
@@ -249,10 +250,23 @@ public class GameManager : MonoBehaviour
         var renderer = wall.GetComponent<SpriteRenderer>();
         renderer.sprite = RuntimeSpriteFactory.WhiteSprite;
         renderer.color = new Color(0.2f, 0.95f, 1f, 0.9f);
+        renderer.sortingOrder = 2;
 
         var collider = wall.GetComponent<BoxCollider2D>();
         collider.isTrigger = true;
         collider.size = Vector2.one;
+    }
+
+    private void CreateArenaBackground()
+    {
+        var background = new GameObject("ArenaBackground", typeof(SpriteRenderer));
+        background.transform.position = Vector3.zero;
+        background.transform.localScale = new Vector3(arenaSize.x, arenaSize.y, 1f);
+
+        var renderer = background.GetComponent<SpriteRenderer>();
+        renderer.sprite = RuntimeSpriteFactory.WhiteSprite;
+        renderer.color = new Color(0.11f, 0.16f, 0.13f, 1f);
+        renderer.sortingOrder = -1;
     }
 
 }
