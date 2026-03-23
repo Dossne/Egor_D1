@@ -12,6 +12,7 @@ public class GameManager : MonoBehaviour
     {
         public List<Vector2> berryPositions = new();
         public List<ObstacleConfig> obstacles = new();
+        public List<SpikePlatformConfig> spikePlatforms = new();
     }
 
     [System.Serializable]
@@ -22,6 +23,13 @@ public class GameManager : MonoBehaviour
         public float radius;
         public float length;
         public bool horizontal;
+    }
+
+    [System.Serializable]
+    private class SpikePlatformConfig
+    {
+        public Vector2 position;
+        public Vector2 size = new(1.22f, 1.22f);
     }
 
     private enum ObstacleType
@@ -50,6 +58,8 @@ public class GameManager : MonoBehaviour
 
     private readonly List<Berry> activeBerries = new();
     private readonly List<GameObject> activeJuiceDroplets = new();
+    private readonly List<Vector2> currentMinePositions = new();
+    private readonly List<float> currentMineRadii = new();
 
     private SnakeController snakeController;
     private JoystickInput joystickInput;
@@ -67,6 +77,9 @@ public class GameManager : MonoBehaviour
     private float remainingLevelTime;
     private bool isResultMenuPending;
     private const int TotalLevelCount = 21;
+    private const float BerryRadius = 0.372f;
+    private const float BerryWallClearance = 0.2f;
+    private const float BerryMineClearance = 0.15f;
 
     private void Awake()
     {
@@ -190,11 +203,11 @@ public class GameManager : MonoBehaviour
 
         levelText = CreateText(canvasObject.transform, "LevelText", new Vector2(20f, -20f), new Vector2(420f, 96f), TextAnchor.UpperLeft, 48);
         levelText.color = new Color(1f, 0.95f, 0.2f);
-        timerText = CreateText(canvasObject.transform, "TimerText", new Vector2(-20f, -20f), new Vector2(320f, 96f), TextAnchor.UpperRight, 48);
+        timerText = CreateText(canvasObject.transform, "TimerText", new Vector2(0f, -24f), new Vector2(420f, 132f), TextAnchor.UpperCenter, 72);
         var timerRect = timerText.GetComponent<RectTransform>();
-        timerRect.anchorMin = new Vector2(1f, 1f);
-        timerRect.anchorMax = new Vector2(1f, 1f);
-        timerRect.pivot = new Vector2(1f, 1f);
+        timerRect.anchorMin = new Vector2(0.5f, 1f);
+        timerRect.anchorMax = new Vector2(0.5f, 1f);
+        timerRect.pivot = new Vector2(0.5f, 1f);
         timerText.color = new Color(1f, 0.95f, 0.2f);
 
         levelCompleteMenu = new GameObject("LevelCompleteMenu", typeof(RectTransform), typeof(Image));
@@ -322,7 +335,7 @@ public class GameManager : MonoBehaviour
             SpawnMineExplosion(deathPosition);
         }
 
-        StartCoroutine(ShowResultMenuAfterDelay("You died", false));
+        StartCoroutine(ShowResultMenuAfterDelay("you died", false));
     }
 
     private void RestartCurrentLevel()
@@ -368,11 +381,11 @@ public class GameManager : MonoBehaviour
         }
 
         var level = levels[Mathf.Clamp(currentLevelIndex, 0, levels.Count - 1)];
-        var levelScale = GetArenaScaleForLevel(currentLevelIndex);
-        for (var i = 0; i < level.berryPositions.Count; i++)
+        var berryPositions = BuildBerrySpawnPositions(level);
+        for (var i = 0; i < berryPositions.Count; i++)
         {
             var berryObject = new GameObject($"Berry_{i + 1}", typeof(SpriteRenderer), typeof(CircleCollider2D), typeof(Berry));
-            berryObject.transform.position = level.berryPositions[i] * levelScale;
+            berryObject.transform.position = berryPositions[i];
 
             var berry = berryObject.GetComponent<Berry>();
             berry.Setup(this, growthPerBerry);
@@ -407,14 +420,19 @@ public class GameManager : MonoBehaviour
     {
         for (var i = 1; i < levels.Count; i++)
         {
-            if (levels[i].berryPositions.Count < 4 || levels[i].berryPositions.Count > 6)
-            {
-                levels[i].berryPositions = GenerateBerryPositionsForLevel(i);
-            }
-
             if (levels[i].obstacles == null || levels[i].obstacles.Count == 0)
             {
                 levels[i].obstacles = GenerateObstaclesForLevel(i);
+            }
+
+            if (levels[i].berryPositions.Count < 4 || levels[i].berryPositions.Count > 6)
+            {
+                levels[i].berryPositions = GenerateBerryPositionsForLevel(i, levels[i].obstacles);
+            }
+
+            if (i >= 2 && (levels[i].spikePlatforms == null || levels[i].spikePlatforms.Count == 0))
+            {
+                levels[i].spikePlatforms = GenerateSpikePlatformsForLevel(i, levels[i].obstacles);
             }
         }
     }
@@ -512,6 +530,9 @@ public class GameManager : MonoBehaviour
 
     private void CreateLevelObstacles()
     {
+        currentMinePositions.Clear();
+        currentMineRadii.Clear();
+
         if (currentLevelIndex <= 0 || levels.Count == 0)
         {
             return;
@@ -519,17 +540,26 @@ public class GameManager : MonoBehaviour
 
         var level = levels[Mathf.Clamp(currentLevelIndex, 0, levels.Count - 1)];
         var levelScale = GetArenaScaleForLevel(currentLevelIndex);
-        if (level.obstacles == null)
+        if (level.obstacles != null)
         {
-            return;
+            for (var i = 0; i < level.obstacles.Count; i++)
+            {
+                var obstacle = level.obstacles[i];
+                if (obstacle.type == ObstacleType.Pillar)
+                {
+                    CreateMineObstacle($"Mine_{i + 1}", obstacle.position * levelScale, obstacle.radius);
+                    currentMinePositions.Add(obstacle.position);
+                    currentMineRadii.Add(obstacle.radius);
+                }
+            }
         }
 
-        for (var i = 0; i < level.obstacles.Count; i++)
+        if (currentLevelIndex >= 2 && level.spikePlatforms != null)
         {
-            var obstacle = level.obstacles[i];
-            if (obstacle.type == ObstacleType.Pillar)
+            for (var i = 0; i < level.spikePlatforms.Count; i++)
             {
-                CreateMineObstacle($"Mine_{i + 1}", obstacle.position * levelScale, obstacle.radius);
+                var platform = level.spikePlatforms[i];
+                CreateSpikePlatform($"SpikePlatform_{i + 1}", platform.position * levelScale, platform.size);
             }
         }
     }
@@ -586,48 +616,229 @@ public class GameManager : MonoBehaviour
         glowRenderer.sortingOrder = 2;
     }
 
+    private void CreateSpikePlatform(string name, Vector2 position, Vector2 size)
+    {
+        var platform = new GameObject(name, typeof(SpriteRenderer), typeof(BoxCollider2D), typeof(SpikePlatform));
+        platform.transform.SetParent(arenaRoot, true);
+        platform.transform.position = position;
+        platform.transform.localScale = new Vector3(size.x, size.y, 1f);
+
+        var baseRenderer = platform.GetComponent<SpriteRenderer>();
+        baseRenderer.sprite = RuntimeSpriteFactory.WhiteSprite;
+        baseRenderer.color = new Color(0.44f, 0.44f, 0.44f, 1f);
+        baseRenderer.sortingOrder = 2;
+
+        var border = new GameObject("Border", typeof(SpriteRenderer));
+        border.transform.SetParent(platform.transform, false);
+        border.transform.localScale = new Vector3(1.08f, 1.08f, 1f);
+        var borderRenderer = border.GetComponent<SpriteRenderer>();
+        borderRenderer.sprite = RuntimeSpriteFactory.WhiteSprite;
+        borderRenderer.color = new Color(0.26f, 0.26f, 0.26f, 1f);
+        borderRenderer.sortingOrder = 1;
+
+        var spikeRoots = new List<Transform>();
+        const int spikeColumns = 3;
+        const int spikeRows = 3;
+        for (var y = 0; y < spikeRows; y++)
+        {
+            for (var x = 0; x < spikeColumns; x++)
+            {
+                var spike = new GameObject($"Spike_{x}_{y}", typeof(SpriteRenderer));
+                spike.transform.SetParent(platform.transform, false);
+                spike.transform.localPosition = new Vector3(-0.3f + x * 0.3f, -0.16f, 0f);
+                spike.transform.localScale = new Vector3(0.3f, 0.34f, 1f);
+                var spikeRenderer = spike.GetComponent<SpriteRenderer>();
+                spikeRenderer.sprite = RuntimeSpriteFactory.SpikeSprite;
+                spikeRenderer.color = Color.white;
+                spikeRenderer.sortingOrder = 3;
+                spikeRoots.Add(spike.transform);
+            }
+        }
+
+        var collider = platform.GetComponent<BoxCollider2D>();
+        collider.isTrigger = true;
+        collider.size = Vector2.one;
+
+        var spikePlatform = platform.GetComponent<SpikePlatform>();
+        spikePlatform.Setup(spikeRoots, baseRenderer);
+    }
+
     private void CreateLineObstacle(string name, Vector2 position, float length, bool horizontal)
     {
         var size = horizontal ? new Vector2(length, wallThickness) : new Vector2(wallThickness, length);
         CreateWall(name, position, size);
     }
 
-    private List<Vector2> GenerateBerryPositionsForLevel(int levelIndex)
+    private List<Vector2> BuildBerrySpawnPositions(LevelConfig level)
     {
-        var random = new System.Random(7021 + levelIndex * 37);
-        var berryCount = random.Next(4, 7);
-        var positions = new List<Vector2>(berryCount);
-        var minDistance = 1.8f;
-        var maxDistanceFromCenter = 4.2f;
-
-        while (positions.Count < berryCount)
+        var desiredCount = Mathf.Max(3, level.berryPositions != null ? level.berryPositions.Count : 0);
+        var levelScale = GetArenaScaleForLevel(currentLevelIndex);
+        var unscaledMines = new List<Vector2>();
+        var unscaledMineRadii = new List<float>();
+        for (var i = 0; i < currentMinePositions.Count; i++)
         {
-            var candidate = new Vector2(
-                Mathf.Lerp(-maxDistanceFromCenter, maxDistanceFromCenter, (float)random.NextDouble()),
-                Mathf.Lerp(-maxDistanceFromCenter, maxDistanceFromCenter, (float)random.NextDouble()));
+            unscaledMines.Add(currentMinePositions[i]);
+            unscaledMineRadii.Add(currentMineRadii[i]);
+        }
 
-            if (candidate.magnitude < 1.4f)
+        var layout = GenerateBerryLayout(currentLevelIndex, desiredCount, unscaledMines, unscaledMineRadii);
+        level.berryPositions = layout;
+        return layout.ConvertAll(position => position * levelScale);
+    }
+
+    private List<Vector2> GenerateBerryLayout(int levelIndex, int berryCount, List<Vector2> minePositions, List<float> mineRadii)
+    {
+        var random = new System.Random(8117 + levelIndex * 61);
+        var positions = new List<Vector2>(berryCount);
+        var nearTarget = Mathf.Min(2, berryCount);
+        var nearGenerated = 0;
+        var attempts = 0;
+        var maxAttempts = 800;
+
+        while (positions.Count < berryCount && attempts < maxAttempts)
+        {
+            attempts++;
+            var nearHazard = nearGenerated < nearTarget;
+            var candidate = nearHazard ? SampleNearHazardPoint(random, minePositions, mineRadii) : SampleSafePoint(random);
+            if (!IsBerryPositionValid(candidate, positions, minePositions, mineRadii, nearHazard))
             {
                 continue;
             }
 
-            var isFarEnough = true;
-            for (var i = 0; i < positions.Count; i++)
+            positions.Add(candidate);
+            if (nearHazard)
             {
-                if (Vector2.Distance(candidate, positions[i]) < minDistance)
-                {
-                    isFarEnough = false;
-                    break;
-                }
+                nearGenerated++;
             }
+        }
 
-            if (isFarEnough)
+        while (positions.Count < berryCount)
+        {
+            var fallback = SampleSafePoint(random);
+            if (IsBerryPositionValid(fallback, positions, minePositions, mineRadii, false))
             {
-                positions.Add(candidate);
+                positions.Add(fallback);
+            }
+            else
+            {
+                positions.Add(new Vector2(positions.Count * 0.65f - 1.3f, -2.2f + positions.Count * 0.45f));
             }
         }
 
         return positions;
+    }
+
+    private Vector2 SampleNearHazardPoint(System.Random random, List<Vector2> minePositions, List<float> mineRadii)
+    {
+        var preferWalls = minePositions.Count == 0 || random.NextDouble() < 0.55;
+        if (preferWalls)
+        {
+            var edge = random.Next(0, 4);
+            var halfWidth = baseArenaSize.x * 0.5f - (BerryRadius + BerryWallClearance + 0.15f);
+            var halfHeight = baseArenaSize.y * 0.5f - (BerryRadius + BerryWallClearance + 0.15f);
+            var depth = Mathf.Lerp(0.55f, 1.35f, (float)random.NextDouble());
+            switch (edge)
+            {
+                case 0:
+                    return new Vector2(Mathf.Lerp(-halfWidth, halfWidth, (float)random.NextDouble()), halfHeight - depth);
+                case 1:
+                    return new Vector2(Mathf.Lerp(-halfWidth, halfWidth, (float)random.NextDouble()), -halfHeight + depth);
+                case 2:
+                    return new Vector2(-halfWidth + depth, Mathf.Lerp(-halfHeight, halfHeight, (float)random.NextDouble()));
+                default:
+                    return new Vector2(halfWidth - depth, Mathf.Lerp(-halfHeight, halfHeight, (float)random.NextDouble()));
+            }
+        }
+
+        var mineIndex = random.Next(0, minePositions.Count);
+        var mine = minePositions[mineIndex];
+        var radius = mineRadii[mineIndex] + BerryRadius + BerryMineClearance + Mathf.Lerp(0.15f, 0.5f, (float)random.NextDouble());
+        var angle = Mathf.Lerp(0f, Mathf.PI * 2f, (float)random.NextDouble());
+        return mine + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius;
+    }
+
+    private Vector2 SampleSafePoint(System.Random random)
+    {
+        var halfWidth = baseArenaSize.x * 0.5f - (BerryRadius + BerryWallClearance + 0.4f);
+        var halfHeight = baseArenaSize.y * 0.5f - (BerryRadius + BerryWallClearance + 0.4f);
+        return new Vector2(
+            Mathf.Lerp(-halfWidth, halfWidth, (float)random.NextDouble()),
+            Mathf.Lerp(-halfHeight, halfHeight, (float)random.NextDouble()));
+    }
+
+    private bool IsBerryPositionValid(
+        Vector2 candidate,
+        List<Vector2> existingPositions,
+        List<Vector2> minePositions,
+        List<float> mineRadii,
+        bool mustBeNearHazard)
+    {
+        var halfWidth = baseArenaSize.x * 0.5f;
+        var halfHeight = baseArenaSize.y * 0.5f;
+        var distanceToWall = Mathf.Min(halfWidth - Mathf.Abs(candidate.x), halfHeight - Mathf.Abs(candidate.y));
+        if (distanceToWall < BerryRadius + BerryWallClearance)
+        {
+            return false;
+        }
+
+        var isNearHazard = distanceToWall <= BerryRadius + BerryWallClearance + 1.35f;
+        for (var i = 0; i < minePositions.Count; i++)
+        {
+            var distanceToMineCenter = Vector2.Distance(candidate, minePositions[i]);
+            var minAllowed = mineRadii[i] + BerryRadius + BerryMineClearance;
+            if (distanceToMineCenter < minAllowed)
+            {
+                return false;
+            }
+
+            if (distanceToMineCenter <= minAllowed + 0.55f)
+            {
+                isNearHazard = true;
+            }
+        }
+
+        if (mustBeNearHazard && !isNearHazard)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < existingPositions.Count; i++)
+        {
+            if (Vector2.Distance(candidate, existingPositions[i]) < 1.35f)
+            {
+                return false;
+            }
+        }
+
+        if (candidate.magnitude < 1.2f)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private List<Vector2> GenerateBerryPositionsForLevel(int levelIndex, List<ObstacleConfig> obstacles)
+    {
+        var random = new System.Random(7021 + levelIndex * 37);
+        var berryCount = random.Next(4, 7);
+        var obstaclePositions = new List<Vector2>();
+        var obstacleRadii = new List<float>();
+        if (obstacles != null)
+        {
+            for (var i = 0; i < obstacles.Count; i++)
+            {
+                if (obstacles[i].type != ObstacleType.Pillar)
+                {
+                    continue;
+                }
+
+                obstaclePositions.Add(obstacles[i].position);
+                obstacleRadii.Add(obstacles[i].radius);
+            }
+        }
+
+        return GenerateBerryLayout(levelIndex, berryCount, obstaclePositions, obstacleRadii);
     }
 
     private List<ObstacleConfig> GenerateObstaclesForLevel(int levelIndex)
@@ -647,6 +858,76 @@ public class GameManager : MonoBehaviour
         }
 
         return obstacles;
+    }
+
+    private List<SpikePlatformConfig> GenerateSpikePlatformsForLevel(int levelIndex, List<ObstacleConfig> obstacles)
+    {
+        var random = new System.Random(12811 + levelIndex * 71);
+        var platforms = new List<SpikePlatformConfig>();
+        var targetCount = random.Next(1, 4);
+        while (platforms.Count < targetCount)
+        {
+            var candidate = CreateSpikePlatformPosition(random, platforms, obstacles);
+            platforms.Add(new SpikePlatformConfig
+            {
+                position = candidate,
+                size = new Vector2(Mathf.Lerp(1.12f, 1.34f, (float)random.NextDouble()), Mathf.Lerp(1.12f, 1.34f, (float)random.NextDouble()))
+            });
+        }
+
+        return platforms;
+    }
+
+    private Vector2 CreateSpikePlatformPosition(System.Random random, List<SpikePlatformConfig> existingPlatforms, List<ObstacleConfig> obstacles)
+    {
+        const float minX = 1.2f;
+        const float maxX = 3.7f;
+        const float minY = 1.8f;
+        const float maxY = 5.5f;
+        var attempts = 0;
+        while (attempts < 80)
+        {
+            attempts++;
+            var xSign = random.Next(0, 2) == 0 ? -1f : 1f;
+            var ySign = random.Next(0, 2) == 0 ? -1f : 1f;
+            var candidate = new Vector2(
+                xSign * Mathf.Lerp(minX, maxX, (float)random.NextDouble()),
+                ySign * Mathf.Lerp(minY, maxY, (float)random.NextDouble()));
+
+            var tooClose = false;
+            for (var i = 0; i < existingPlatforms.Count; i++)
+            {
+                if (Vector2.Distance(candidate, existingPlatforms[i].position) < 2f)
+                {
+                    tooClose = true;
+                    break;
+                }
+            }
+
+            if (!tooClose && obstacles != null)
+            {
+                for (var i = 0; i < obstacles.Count; i++)
+                {
+                    if (obstacles[i].type != ObstacleType.Pillar)
+                    {
+                        continue;
+                    }
+
+                    if (Vector2.Distance(candidate, obstacles[i].position) < 1.8f)
+                    {
+                        tooClose = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!tooClose)
+            {
+                return candidate;
+            }
+        }
+
+        return new Vector2(Mathf.Lerp(-2.6f, 2.6f, (float)random.NextDouble()), Mathf.Lerp(-4.8f, 4.8f, (float)random.NextDouble()));
     }
 
     private Vector2 CreateObstaclePosition(System.Random random, List<ObstacleConfig> existingObstacles)

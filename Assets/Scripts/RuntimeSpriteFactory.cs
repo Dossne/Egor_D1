@@ -12,6 +12,7 @@ public static class RuntimeSpriteFactory
     private static Sprite wallSprite;
     private static Sprite mineBodySprite;
     private static Sprite tableSprite;
+    private static Sprite spikeSprite;
 
     public static Sprite WhiteSprite
     {
@@ -143,6 +144,19 @@ public static class RuntimeSpriteFactory
             }
 
             return tableSprite;
+        }
+    }
+
+    public static Sprite SpikeSprite
+    {
+        get
+        {
+            if (spikeSprite == null)
+            {
+                spikeSprite = CreateSpikeSprite(64, 88);
+            }
+
+            return spikeSprite;
         }
     }
 
@@ -455,6 +469,38 @@ public static class RuntimeSpriteFactory
         return Sprite.Create(texture, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 16f);
     }
 
+    private static Sprite CreateSpikeSprite(int width, int height)
+    {
+        var texture = CreateTransparentTexture(width, height);
+        var apex = new Vector2((width - 1) * 0.5f, height - 1f);
+        var baseLeft = new Vector2(width * 0.18f, 0f);
+        var baseRight = new Vector2(width * 0.82f, 0f);
+
+        for (var y = 0; y < height; y++)
+        {
+            for (var x = 0; x < width; x++)
+            {
+                var point = new Vector2(x, y);
+                if (!PointInTriangle(point, baseLeft, baseRight, apex))
+                {
+                    continue;
+                }
+
+                var gradient = Mathf.Clamp01((float)y / (height - 1));
+                var color = Color.Lerp(new Color(0.58f, 0.5f, 0.38f, 1f), new Color(0.86f, 0.1f, 0.1f, 1f), gradient);
+                if (Mathf.Abs(x - width * 0.5f) < width * 0.07f)
+                {
+                    color = Color.Lerp(color, new Color(0.93f, 0.86f, 0.76f, 1f), 0.35f);
+                }
+
+                texture.SetPixel(x, y, color);
+            }
+        }
+
+        texture.Apply();
+        return Sprite.Create(texture, new Rect(0, 0, width, height), new Vector2(0.5f, 0f), width);
+    }
+
     private static Texture2D CreateTransparentTexture(int width, int height)
     {
         var texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
@@ -545,5 +591,19 @@ public static class RuntimeSpriteFactory
                 }
             }
         }
+    }
+
+    private static bool PointInTriangle(Vector2 point, Vector2 a, Vector2 b, Vector2 c)
+    {
+        var denominator = (b.y - c.y) * (a.x - c.x) + (c.x - b.x) * (a.y - c.y);
+        if (Mathf.Abs(denominator) < 0.0001f)
+        {
+            return false;
+        }
+
+        var alpha = ((b.y - c.y) * (point.x - c.x) + (c.x - b.x) * (point.y - c.y)) / denominator;
+        var beta = ((c.y - a.y) * (point.x - c.x) + (a.x - c.x) * (point.y - c.y)) / denominator;
+        var gamma = 1f - alpha - beta;
+        return alpha >= 0f && beta >= 0f && gamma >= 0f;
     }
 }
