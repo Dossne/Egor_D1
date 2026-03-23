@@ -1,9 +1,13 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using UnityEngine.Serialization;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 public class GameManager : MonoBehaviour
 {
@@ -61,6 +65,9 @@ public class GameManager : MonoBehaviour
     [SerializeField] private Sprite uiPopupSprite;
     [SerializeField] private Sprite uiButtonSprite;
     [SerializeField] private Sprite uiJoystickSprite;
+    [SerializeField] private Sprite uiTimerIconSprite;
+    [SerializeField] private Sprite uiWinIconSprite;
+    [SerializeField] private Sprite uiRetryIconSprite;
 
     private readonly List<Berry> activeBerries = new();
     private readonly List<GameObject> activeJuiceDroplets = new();
@@ -90,10 +97,14 @@ public class GameManager : MonoBehaviour
     private readonly Color timerDefaultColor = new(1f, 0.95f, 0.2f);
     private readonly Color titleTextColor = new(0.97f, 0.91f, 0.68f);
     private readonly Color bodyTextColor = new(0.96f, 0.93f, 0.82f);
+    private readonly Color panelTintColor = new(0.17f, 0.13f, 0.09f, 0.97f);
+    private readonly Color buttonFallbackColor = new(0.28f, 0.2f, 0.12f, 0.98f);
+    private readonly Color iconTintColor = new(1f, 0.95f, 0.78f, 1f);
 
     private void Awake()
     {
         Time.timeScale = 1f;
+        TryAutoAssignGuiProAssets();
         SetupPortraitOrientation();
         SetupCamera();
         SetupUi();
@@ -188,24 +199,24 @@ public class GameManager : MonoBehaviour
         joystickRect.anchorMin = new Vector2(0.5f, 0.5f);
         joystickRect.anchorMax = new Vector2(0.5f, 0.5f);
         joystickRect.pivot = new Vector2(0.5f, 0.5f);
-        joystickRect.sizeDelta = new Vector2(220f, 220f);
+        joystickRect.sizeDelta = new Vector2(236f, 236f);
 
         var joystickBg = joystickRoot.GetComponent<Image>();
-        joystickBg.color = new Color(1f, 1f, 1f, 0.8f);
+        joystickBg.color = new Color(1f, 1f, 1f, 0.78f);
         joystickBg.sprite = uiJoystickSprite != null ? uiJoystickSprite : RuntimeSpriteFactory.CircleSprite;
-        joystickBg.type = Image.Type.Simple;
-        joystickBg.preserveAspect = true;
+        joystickBg.type = uiJoystickSprite != null ? Image.Type.Sliced : Image.Type.Simple;
+        joystickBg.preserveAspect = uiJoystickSprite == null;
         joystickBg.raycastTarget = false;
 
         var handleObject = new GameObject("Handle", typeof(RectTransform), typeof(Image));
         handleObject.transform.SetParent(joystickRoot.transform, false);
         var handleRect = handleObject.GetComponent<RectTransform>();
-        handleRect.sizeDelta = new Vector2(94f, 94f);
+        handleRect.sizeDelta = new Vector2(102f, 102f);
         var handleImage = handleObject.GetComponent<Image>();
         handleImage.sprite = uiButtonSprite != null ? uiButtonSprite : RuntimeSpriteFactory.CircleSprite;
-        handleImage.color = new Color(1f, 1f, 1f, 0.88f);
-        handleImage.type = Image.Type.Simple;
-        handleImage.preserveAspect = true;
+        handleImage.color = new Color(1f, 1f, 1f, 0.93f);
+        handleImage.type = uiButtonSprite != null ? Image.Type.Sliced : Image.Type.Simple;
+        handleImage.preserveAspect = uiButtonSprite == null;
         handleImage.raycastTarget = false;
 
         joystickInput = joystickArea.GetComponent<JoystickInput>();
@@ -213,12 +224,14 @@ public class GameManager : MonoBehaviour
 
         levelText = CreateText(canvasObject.transform, "LevelText", new Vector2(20f, -20f), new Vector2(420f, 96f), TextAnchor.UpperLeft, 48);
         levelText.color = titleTextColor;
+        levelText.text = "level 1";
         timerText = CreateText(canvasObject.transform, "TimerText", new Vector2(0f, -24f), new Vector2(420f, 132f), TextAnchor.UpperCenter, 72);
         var timerRect = timerText.GetComponent<RectTransform>();
         timerRect.anchorMin = new Vector2(0.5f, 1f);
         timerRect.anchorMax = new Vector2(0.5f, 1f);
         timerRect.pivot = new Vector2(0.5f, 1f);
         timerText.color = timerDefaultColor;
+        CreateDecorativeIcon(canvasObject.transform, "TimerIcon", uiTimerIconSprite, new Vector2(-190f, -54f), new Vector2(80f, 80f), iconTintColor);
 
         levelCompleteMenu = new GameObject("LevelCompleteMenu", typeof(RectTransform), typeof(Image));
         levelCompleteMenu.transform.SetParent(canvasObject.transform, false);
@@ -232,7 +245,9 @@ public class GameManager : MonoBehaviour
         menuBackground.type = uiPopupSprite != null ? Image.Type.Sliced : Image.Type.Simple;
         menuBackground.color = uiPopupSprite != null
             ? Color.white
-            : new Color(0.08f, 0.1f, 0.16f, 0.95f);
+            : panelTintColor;
+
+        CreateDecorativeIcon(levelCompleteMenu.transform, "ResultIcon", uiWinIconSprite, new Vector2(0f, 165f), new Vector2(92f, 92f), iconTintColor);
 
         levelCompleteText = CreateText(levelCompleteMenu.transform, "LevelCompleteText", new Vector2(0f, 130f), new Vector2(640f, 120f), TextAnchor.MiddleCenter, 72);
         var levelCompleteRect = levelCompleteText.GetComponent<RectTransform>();
@@ -252,8 +267,8 @@ public class GameManager : MonoBehaviour
         levelStarsText.color = new Color(1f, 0.87f, 0.26f, 1f);
         levelStarsText.text = string.Empty;
 
-        nextLevelButton = CreateMenuButton(levelCompleteMenu.transform, "NextLevelButton", "next level", new Vector2(0f, 10f), HandleNextLevelPressed);
-        CreateMenuButton(levelCompleteMenu.transform, "RetryButton", "retry", new Vector2(0f, -120f), HandleRetryPressed);
+        nextLevelButton = CreateMenuButton(levelCompleteMenu.transform, "NextLevelButton", "next level", new Vector2(0f, 10f), uiWinIconSprite, HandleNextLevelPressed);
+        CreateMenuButton(levelCompleteMenu.transform, "RetryButton", "retry", new Vector2(0f, -120f), uiRetryIconSprite, HandleRetryPressed);
         levelCompleteMenu.SetActive(false);
     }
 
@@ -1110,7 +1125,7 @@ public class GameManager : MonoBehaviour
         text.supportRichText = false;
         text.horizontalOverflow = HorizontalWrapMode.Wrap;
         text.verticalOverflow = VerticalWrapMode.Overflow;
-        text.fontStyle = FontStyle.Bold;
+        text.fontStyle = FontStyle.Normal;
         text.fontSize = fontSize;
         text.alignment = alignment;
         text.text = string.Empty;
@@ -1266,6 +1281,11 @@ public class GameManager : MonoBehaviour
 
     private GameObject CreateMenuButton(Transform parent, string name, string label, Vector2 anchoredPosition, UnityEngine.Events.UnityAction callback)
     {
+        return CreateMenuButton(parent, name, label, anchoredPosition, null, callback);
+    }
+
+    private GameObject CreateMenuButton(Transform parent, string name, string label, Vector2 anchoredPosition, Sprite iconSprite, UnityEngine.Events.UnityAction callback)
+    {
         var buttonObject = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
         buttonObject.transform.SetParent(parent, false);
 
@@ -1281,7 +1301,7 @@ public class GameManager : MonoBehaviour
         buttonImage.type = uiButtonSprite != null ? Image.Type.Sliced : Image.Type.Simple;
         buttonImage.color = uiButtonSprite != null
             ? Color.white
-            : new Color(0.24f, 0.36f, 0.18f, 0.97f);
+            : buttonFallbackColor;
 
         var button = buttonObject.GetComponent<Button>();
         button.onClick.AddListener(callback);
@@ -1298,15 +1318,91 @@ public class GameManager : MonoBehaviour
             fadeDuration = 0.08f
         };
 
-        var text = CreateText(buttonObject.transform, "Label", new Vector2(0f, 0f), new Vector2(420f, 92f), TextAnchor.MiddleCenter, 44);
+        var text = CreateText(buttonObject.transform, "Label", new Vector2(0f, 0f), new Vector2(320f, 92f), TextAnchor.MiddleCenter, 44);
         var textRect = text.GetComponent<RectTransform>();
         textRect.anchorMin = new Vector2(0.5f, 0.5f);
         textRect.anchorMax = new Vector2(0.5f, 0.5f);
         textRect.pivot = new Vector2(0.5f, 0.5f);
-        textRect.anchoredPosition = Vector2.zero;
+        textRect.anchoredPosition = new Vector2(22f, 0f);
         text.color = bodyTextColor;
         text.text = label;
+
+        if (iconSprite != null)
+        {
+            CreateDecorativeIcon(buttonObject.transform, "Icon", iconSprite, new Vector2(-140f, 0f), new Vector2(56f, 56f), iconTintColor);
+        }
+
         return buttonObject;
     }
+
+    private GameObject CreateDecorativeIcon(Transform parent, string name, Sprite iconSprite, Vector2 anchoredPosition, Vector2 size, Color tint)
+    {
+        if (iconSprite == null)
+        {
+            return null;
+        }
+
+        var iconObject = new GameObject(name, typeof(RectTransform), typeof(Image));
+        iconObject.transform.SetParent(parent, false);
+        var iconRect = iconObject.GetComponent<RectTransform>();
+        iconRect.anchorMin = new Vector2(0.5f, 0.5f);
+        iconRect.anchorMax = new Vector2(0.5f, 0.5f);
+        iconRect.pivot = new Vector2(0.5f, 0.5f);
+        iconRect.anchoredPosition = anchoredPosition;
+        iconRect.sizeDelta = size;
+
+        var iconImage = iconObject.GetComponent<Image>();
+        iconImage.sprite = iconSprite;
+        iconImage.type = Image.Type.Simple;
+        iconImage.preserveAspect = true;
+        iconImage.color = tint;
+        iconImage.raycastTarget = false;
+        return iconObject;
+    }
+
+    private void TryAutoAssignGuiProAssets()
+    {
+#if UNITY_EDITOR
+        if (uiFont != null && uiPopupSprite != null && uiButtonSprite != null && uiJoystickSprite != null)
+        {
+            return;
+        }
+
+        const string packageMarker = "GUI Pro - Fantasy RPG";
+        var packageRoots = AssetDatabase.GetSubFolders("Assets")
+            .Where(path => path.Contains(packageMarker))
+            .ToArray();
+        if (packageRoots.Length == 0)
+        {
+            return;
+        }
+
+        uiFont = uiFont != null ? uiFont : FindAssetInFolders<Font>(packageRoots, "t:Font", "font");
+        uiPopupSprite = uiPopupSprite != null ? uiPopupSprite : FindAssetInFolders<Sprite>(packageRoots, "t:Sprite", "panel", "window", "popup", "frame");
+        uiButtonSprite = uiButtonSprite != null ? uiButtonSprite : FindAssetInFolders<Sprite>(packageRoots, "t:Sprite", "button");
+        uiJoystickSprite = uiJoystickSprite != null ? uiJoystickSprite : FindAssetInFolders<Sprite>(packageRoots, "t:Sprite", "circle", "ring", "pad", "joystick");
+        uiTimerIconSprite = uiTimerIconSprite != null ? uiTimerIconSprite : FindAssetInFolders<Sprite>(packageRoots, "t:Sprite", "clock", "time", "hourglass");
+        uiWinIconSprite = uiWinIconSprite != null ? uiWinIconSprite : FindAssetInFolders<Sprite>(packageRoots, "t:Sprite", "star", "crown", "gem");
+        uiRetryIconSprite = uiRetryIconSprite != null ? uiRetryIconSprite : FindAssetInFolders<Sprite>(packageRoots, "t:Sprite", "refresh", "retry", "arrow");
+#endif
+    }
+
+#if UNITY_EDITOR
+    private static T FindAssetInFolders<T>(string[] folders, string typeQuery, params string[] preferredNameMarkers) where T : Object
+    {
+        var guids = AssetDatabase.FindAssets(typeQuery, folders);
+        var preferred = guids
+            .Select(AssetDatabase.GUIDToAssetPath)
+            .Where(path => preferredNameMarkers.Any(marker => path.ToLowerInvariant().Contains(marker)))
+            .FirstOrDefault();
+        if (!string.IsNullOrEmpty(preferred))
+        {
+            return AssetDatabase.LoadAssetAtPath<T>(preferred);
+        }
+
+        var firstPath = guids.Select(AssetDatabase.GUIDToAssetPath).FirstOrDefault();
+        return string.IsNullOrEmpty(firstPath) ? null : AssetDatabase.LoadAssetAtPath<T>(firstPath);
+    }
+#endif
 
 }
