@@ -79,6 +79,11 @@ public class SnakeBody : MonoBehaviour
         segments.Clear();
     }
 
+    private void OnDestroy()
+    {
+        ClearSegments();
+    }
+
     private Transform CreateSegment(Vector3 position)
     {
         var segment = new GameObject($"BodySegment_{segments.Count + 1}");

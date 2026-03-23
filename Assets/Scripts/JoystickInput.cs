@@ -8,6 +8,7 @@ public class JoystickInput : MonoBehaviour, IPointerDownHandler, IDragHandler, I
     [SerializeField] private RectTransform handle;
     [SerializeField] private float handleRange = 70f;
 
+    private RectTransform touchArea;
     private Canvas canvas;
     private Camera uiCamera;
 
@@ -21,11 +22,29 @@ public class JoystickInput : MonoBehaviour, IPointerDownHandler, IDragHandler, I
 
     private void Awake()
     {
+        touchArea = GetComponent<RectTransform>();
         CacheCanvas();
+        SetBackgroundVisible(false);
     }
 
     public void OnPointerDown(PointerEventData eventData)
     {
+        if (background == null || handle == null)
+        {
+            return;
+        }
+
+        if (canvas == null)
+        {
+            CacheCanvas();
+        }
+
+        if (touchArea != null && RectTransformUtility.ScreenPointToLocalPointInRectangle(touchArea, eventData.position, uiCamera, out var localPoint))
+        {
+            background.anchoredPosition = localPoint;
+        }
+
+        SetBackgroundVisible(true);
         OnDrag(eventData);
     }
 
@@ -59,11 +78,21 @@ public class JoystickInput : MonoBehaviour, IPointerDownHandler, IDragHandler, I
         {
             handle.anchoredPosition = Vector2.zero;
         }
+
+        SetBackgroundVisible(false);
     }
 
     private void CacheCanvas()
     {
         canvas = GetComponentInParent<Canvas>();
         uiCamera = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay ? canvas.worldCamera : null;
+    }
+
+    private void SetBackgroundVisible(bool isVisible)
+    {
+        if (background != null)
+        {
+            background.gameObject.SetActive(isVisible);
+        }
     }
 }
