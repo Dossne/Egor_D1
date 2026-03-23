@@ -43,6 +43,7 @@ public class JoystickInput : MonoBehaviour, IPointerDownHandler, IDragHandler, I
         if (touchArea != null && RectTransformUtility.ScreenPointToLocalPointInRectangle(touchArea, eventData.position, uiCamera, out var localPoint))
         {
             background.anchoredPosition = localPoint;
+            ClampBackgroundToTouchArea();
         }
 
         pointerActive = true;
@@ -74,6 +75,7 @@ public class JoystickInput : MonoBehaviour, IPointerDownHandler, IDragHandler, I
             var overDistance = localPointMagnitude - radius;
             var moveOffset = localPoint.normalized * overDistance;
             background.anchoredPosition += moveOffset;
+            ClampBackgroundToTouchArea();
 
             if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(background, eventData.position, uiCamera, out localPoint))
             {
@@ -110,5 +112,19 @@ public class JoystickInput : MonoBehaviour, IPointerDownHandler, IDragHandler, I
         {
             background.gameObject.SetActive(isVisible);
         }
+    }
+
+    private void ClampBackgroundToTouchArea()
+    {
+        if (background == null || touchArea == null)
+        {
+            return;
+        }
+
+        var areaRect = touchArea.rect;
+        var radius = background.sizeDelta.x * 0.5f;
+        var clampedX = Mathf.Clamp(background.anchoredPosition.x, areaRect.xMin + radius, areaRect.xMax - radius);
+        var clampedY = Mathf.Clamp(background.anchoredPosition.y, areaRect.yMin + radius, areaRect.yMax - radius);
+        background.anchoredPosition = new Vector2(clampedX, clampedY);
     }
 }
