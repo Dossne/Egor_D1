@@ -1,80 +1,83 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
 public static class GuiProImportValidator
 {
+    private const string PackageMarker = "GUI Pro - Fantasy RPG";
+
     [MenuItem("Tools/Farm Merger/Validate GUI Pro Import")]
     public static void ValidateImport()
     {
-        var missingFolders = new List<string>();
-        var expectedFolderMarkers = new[]
-        {
-            "Assets/GUI Pro - Fantasy RPG/UI",
-            "Assets/GUI Pro - Fantasy RPG/Fonts",
-            "Assets/GUI Pro - Fantasy RPG/Icons"
-        };
+        var packageRoots = FindPackageRoots();
+        ValidateExpectedFolders(packageRoots);
+        ValidateNineSliceBorders(packageRoots);
+    }
 
-        foreach (var folder in expectedFolderMarkers)
+    private static List<string> FindPackageRoots()
+    {
+        var roots = AssetDatabase.GetSubFolders("Assets")
+            .Where(path => path.Contains(PackageMarker))
+            .ToList();
+
+        if (roots.Count == 0)
         {
-            if (!AssetDatabase.IsValidFolder(folder))
+            Debug.LogWarning($"GUI Pro import validation: package root containing '{PackageMarker}' was not found under Assets/.");
+        }
+
+        return roots;
+    }
+
+    private static void ValidateExpectedFolders(List<string> packageRoots)
+    {
+        var expectedSuffixes = new[] { "/UI", "/Fonts", "/Icons" };
+        var missingFolders = new List<string>();
+
+        foreach (var suffix in expectedSuffixes)
+        {
+            var hasFolder = packageRoots.Any(root => AssetDatabase.IsValidFolder(root + suffix));
+            if (!hasFolder)
             {
-                missingFolders.Add(folder);
+                missingFolders.Add($"...{suffix}");
             }
         }
 
         if (missingFolders.Count > 0)
         {
             Debug.LogWarning("GUI Pro import validation: missing expected folders:\n - " + string.Join("\n - ", missingFolders));
-        }
-        else
-        {
-            Debug.Log("GUI Pro import validation: expected UI, Fonts and Icons folders found.");
+            return;
         }
 
-        ValidateNineSliceBorders();
+        Debug.Log("GUI Pro import validation: expected UI, Fonts and Icons folders found.");
     }
 
-    private static void ValidateNineSliceBorders()
+    private static void ValidateNineSliceBorders(List<string> packageRoots)
     {
-        var guids = AssetDatabase.FindAssets("t:Texture2D", new[] { "Assets/GUI Pro - Fantasy RPG" });
+        if (packageRoots.Count == 0)
+        {
+            return;
+        }
+
         var missingBorders = new List<string>();
+        var guids = AssetDatabase.FindAssets("t:Texture2D", packageRoots.ToArray());
 
         foreach (var guid in guids)
         {
             var path = AssetDatabase.GUIDToAssetPath(guid);
-            var importer = AssetImporter.GetAtPath(path) as TextureImporter;
-            if (importer == null || importer.textureType != TextureImporterType.Sprite)
+            var sprites = AssetDatabase.LoadAllAssetsAtPath(path).OfType<Sprite>().ToArray();
+            if (sprites.Length == 0)
             {
                 continue;
             }
 
-            var spriteImportMode = importer.spriteImportMode;
-            if (spriteImportMode == SpriteImportMode.None)
+            if (!IsNineSliceCandidate(path, sprites))
             {
                 continue;
             }
 
-            var hasAnyBorder = false;
-
-            if (spriteImportMode == SpriteImportMode.Single)
-            {
-                hasAnyBorder = importer.spriteBorder.sqrMagnitude > 0f;
-            }
-            else
-            {
-                var spritesheet = importer.spritesheet;
-                foreach (var meta in spritesheet)
-                {
-                    if (meta.border.sqrMagnitude > 0f)
-                    {
-                        hasAnyBorder = true;
-                        break;
-                    }
-                }
-            }
-
-            if (!hasAnyBorder)
+            var hasBorder = sprites.Any(sprite => sprite.border.sqrMagnitude > 0f);
+            if (!hasBorder)
             {
                 missingBorders.Add(path);
             }
@@ -82,13 +85,30 @@ public static class GuiProImportValidator
 
         if (missingBorders.Count == 0)
         {
-            Debug.Log("GUI Pro import validation: all sprite textures contain at least one 9-slice border.");
+            Debug.Log("GUI Pro import validation: all candidate panel/button sprites contain 9-slice borders.");
             return;
         }
 
         Debug.LogWarning(
-            "GUI Pro import validation: the following sprite textures have no 9-slice border set:\n - " +
+            "GUI Pro import validation: candidate panel/button sprites without 9-slice border:\n - " +
             string.Join("\n - ", missingBorders)
         );
+    }
+
+    private static bool IsNineSliceCandidate(string texturePath, Sprite[] sprites)
+    {
+        var markers = new[] { "panel", "button", "window", "frame", "box" };
+        var pathLower = texturePath.ToLowerInvariant();
+
+        if (markers.Any(marker => pathLower.Contains(marker)))
+        {
+            return true;
+        }
+
+        return sprites.Any(sprite =>
+        {
+            var nameLower = sprite.name.ToLowerInvariant();
+            return markers.Any(marker => nameLower.Contains(marker));
+        });
     }
 }
