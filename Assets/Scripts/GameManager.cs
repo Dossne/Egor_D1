@@ -68,6 +68,8 @@ public class GameManager : MonoBehaviour
     [SerializeField] private Sprite uiTimerIconSprite;
     [SerializeField] private Sprite uiWinIconSprite;
     [SerializeField] private Sprite uiRetryIconSprite;
+    [SerializeField] private Sprite uiResultRibbonSprite;
+    [SerializeField] private Sprite uiStarSprite;
 
     private readonly List<Berry> activeBerries = new();
     private readonly List<GameObject> activeJuiceDroplets = new();
@@ -80,7 +82,8 @@ public class GameManager : MonoBehaviour
     private Text timerText;
     private GameObject levelCompleteMenu;
     private Text levelCompleteText;
-    private Text levelStarsText;
+    private Text resultRibbonText;
+    private readonly List<Image> levelStarImages = new();
     private GameObject nextLevelButton;
     private Camera mainCamera;
     private Transform arenaRoot;
@@ -97,8 +100,8 @@ public class GameManager : MonoBehaviour
     private readonly Color timerDefaultColor = new(1f, 0.95f, 0.2f);
     private readonly Color titleTextColor = new(0.97f, 0.91f, 0.68f);
     private readonly Color bodyTextColor = new(0.96f, 0.93f, 0.82f);
-    private readonly Color panelTintColor = new(0.17f, 0.13f, 0.09f, 0.97f);
-    private readonly Color buttonFallbackColor = new(0.28f, 0.2f, 0.12f, 0.98f);
+    private readonly Color panelTintColor = new(0.12f, 0.1f, 0.22f, 0.96f);
+    private readonly Color buttonFallbackColor = new(0.62f, 0.14f, 0.2f, 0.98f);
     private readonly Color iconTintColor = new(1f, 0.95f, 0.78f, 1f);
 
     private void Awake()
@@ -255,21 +258,72 @@ public class GameManager : MonoBehaviour
         levelCompleteRect.anchorMax = new Vector2(0.5f, 0.5f);
         levelCompleteRect.pivot = new Vector2(0.5f, 0.5f);
         levelCompleteRect.anchoredPosition = new Vector2(0f, 130f);
-        levelCompleteText.color = titleTextColor;
-        levelCompleteText.text = "level complete";
+        levelCompleteText.color = bodyTextColor;
+        levelCompleteText.text = "great run!";
 
-        levelStarsText = CreateText(levelCompleteMenu.transform, "LevelStarsText", new Vector2(0f, 220f), new Vector2(680f, 140f), TextAnchor.MiddleCenter, 120);
-        var starsRect = levelStarsText.GetComponent<RectTransform>();
-        starsRect.anchorMin = new Vector2(0.5f, 0.5f);
-        starsRect.anchorMax = new Vector2(0.5f, 0.5f);
-        starsRect.pivot = new Vector2(0.5f, 0.5f);
-        starsRect.anchoredPosition = new Vector2(0f, 230f);
-        levelStarsText.color = new Color(1f, 0.87f, 0.26f, 1f);
-        levelStarsText.text = string.Empty;
+        var ribbonObject = new GameObject("ResultRibbon", typeof(RectTransform), typeof(Image));
+        ribbonObject.transform.SetParent(levelCompleteMenu.transform, false);
+        var ribbonRect = ribbonObject.GetComponent<RectTransform>();
+        ribbonRect.anchorMin = new Vector2(0.5f, 0.5f);
+        ribbonRect.anchorMax = new Vector2(0.5f, 0.5f);
+        ribbonRect.pivot = new Vector2(0.5f, 0.5f);
+        ribbonRect.anchoredPosition = new Vector2(0f, 200f);
+        ribbonRect.sizeDelta = new Vector2(620f, 146f);
+        var ribbonImage = ribbonObject.GetComponent<Image>();
+        ribbonImage.sprite = uiResultRibbonSprite != null ? uiResultRibbonSprite : RuntimeSpriteFactory.RibbonBannerSprite;
+        ribbonImage.type = Image.Type.Sliced;
+        ribbonImage.color = Color.white;
+
+        resultRibbonText = CreateText(ribbonObject.transform, "RibbonText", Vector2.zero, new Vector2(560f, 110f), TextAnchor.MiddleCenter, 56);
+        var ribbonTextRect = resultRibbonText.GetComponent<RectTransform>();
+        ribbonTextRect.anchorMin = new Vector2(0.5f, 0.5f);
+        ribbonTextRect.anchorMax = new Vector2(0.5f, 0.5f);
+        ribbonTextRect.pivot = new Vector2(0.5f, 0.5f);
+        ribbonTextRect.anchoredPosition = new Vector2(0f, 0f);
+        resultRibbonText.color = Color.white;
+
+        CreateStarRow(levelCompleteMenu.transform);
 
         nextLevelButton = CreateMenuButton(levelCompleteMenu.transform, "NextLevelButton", "next level", new Vector2(0f, 10f), uiWinIconSprite, HandleNextLevelPressed);
         CreateMenuButton(levelCompleteMenu.transform, "RetryButton", "retry", new Vector2(0f, -120f), uiRetryIconSprite, HandleRetryPressed);
         levelCompleteMenu.SetActive(false);
+    }
+
+    private void CreateStarRow(Transform parent)
+    {
+        var starsRoot = new GameObject("LevelStars", typeof(RectTransform), typeof(HorizontalLayoutGroup));
+        starsRoot.transform.SetParent(parent, false);
+        var starsRootRect = starsRoot.GetComponent<RectTransform>();
+        starsRootRect.anchorMin = new Vector2(0.5f, 0.5f);
+        starsRootRect.anchorMax = new Vector2(0.5f, 0.5f);
+        starsRootRect.pivot = new Vector2(0.5f, 0.5f);
+        starsRootRect.anchoredPosition = new Vector2(0f, 90f);
+        starsRootRect.sizeDelta = new Vector2(480f, 130f);
+
+        var layout = starsRoot.GetComponent<HorizontalLayoutGroup>();
+        layout.spacing = 22f;
+        layout.childAlignment = TextAnchor.MiddleCenter;
+        layout.childControlWidth = false;
+        layout.childControlHeight = false;
+        layout.childForceExpandWidth = false;
+        layout.childForceExpandHeight = false;
+
+        for (var i = 0; i < 3; i++)
+        {
+            var starObject = new GameObject($"Star_{i + 1}", typeof(RectTransform), typeof(Image), typeof(LayoutElement));
+            starObject.transform.SetParent(starsRoot.transform, false);
+            var starRect = starObject.GetComponent<RectTransform>();
+            starRect.sizeDelta = new Vector2(112f, 112f);
+            var layoutElement = starObject.GetComponent<LayoutElement>();
+            layoutElement.preferredWidth = 112f;
+            layoutElement.preferredHeight = 112f;
+
+            var starImage = starObject.GetComponent<Image>();
+            starImage.sprite = uiStarSprite != null ? uiStarSprite : RuntimeSpriteFactory.StarSprite;
+            starImage.type = Image.Type.Simple;
+            starImage.preserveAspect = true;
+            levelStarImages.Add(starImage);
+        }
     }
 
     private void BuildArena()
@@ -1111,7 +1165,7 @@ public class GameManager : MonoBehaviour
 
     private Text CreateText(Transform parent, string objectName, Vector2 anchoredPosition, Vector2 size, TextAnchor alignment, int fontSize)
     {
-        var textObject = new GameObject(objectName, typeof(RectTransform), typeof(Text));
+        var textObject = new GameObject(objectName, typeof(RectTransform), typeof(Text), typeof(Shadow));
         textObject.transform.SetParent(parent, false);
         var textRect = textObject.GetComponent<RectTransform>();
         textRect.anchorMin = new Vector2(0f, 1f);
@@ -1129,6 +1183,10 @@ public class GameManager : MonoBehaviour
         text.fontSize = fontSize;
         text.alignment = alignment;
         text.text = string.Empty;
+        var shadow = textObject.GetComponent<Shadow>();
+        shadow.effectColor = new Color(0f, 0f, 0f, 0.45f);
+        shadow.effectDistance = new Vector2(2f, -2f);
+        shadow.useGraphicAlpha = true;
         return text;
     }
 
@@ -1139,10 +1197,15 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        levelCompleteText.text = resultText;
-        if (levelStarsText != null && !showNextLevelButton)
+        if (resultRibbonText != null)
         {
-            levelStarsText.text = string.Empty;
+            resultRibbonText.text = resultText.ToUpperInvariant();
+        }
+
+        levelCompleteText.text = showNextLevelButton ? "great run!" : "tap retry to continue";
+        if (!showNextLevelButton)
+        {
+            UpdateLevelStarsVisual(0);
         }
 
         if (nextLevelButton != null)
@@ -1221,13 +1284,24 @@ public class GameManager : MonoBehaviour
 
     private void UpdateLevelStarsVisual(int starsCount)
     {
-        if (levelStarsText == null)
+        if (levelStarImages.Count == 0)
         {
             return;
         }
 
-        starsCount = Mathf.Clamp(starsCount, 1, 3);
-        levelStarsText.text = new string('★', starsCount);
+        starsCount = Mathf.Clamp(starsCount, 0, 3);
+        for (var i = 0; i < levelStarImages.Count; i++)
+        {
+            if (levelStarImages[i] == null)
+            {
+                continue;
+            }
+
+            var isFilled = i < starsCount;
+            levelStarImages[i].color = isFilled
+                ? Color.white
+                : new Color(0.6f, 0.6f, 0.6f, 0.38f);
+        }
     }
 
     private void SpawnSnakeDeathJuice(Vector3 deathPosition)
@@ -1363,7 +1437,7 @@ public class GameManager : MonoBehaviour
     private void TryAutoAssignGuiProAssets()
     {
 #if UNITY_EDITOR
-        if (uiFont != null && uiPopupSprite != null && uiButtonSprite != null && uiJoystickSprite != null)
+        if (uiFont != null && uiPopupSprite != null && uiButtonSprite != null && uiJoystickSprite != null && uiResultRibbonSprite != null && uiStarSprite != null)
         {
             return;
         }
@@ -1384,6 +1458,8 @@ public class GameManager : MonoBehaviour
         uiTimerIconSprite = uiTimerIconSprite != null ? uiTimerIconSprite : FindAssetInFolders<Sprite>(packageRoots, "t:Sprite", "clock", "time", "hourglass");
         uiWinIconSprite = uiWinIconSprite != null ? uiWinIconSprite : FindAssetInFolders<Sprite>(packageRoots, "t:Sprite", "star", "crown", "gem");
         uiRetryIconSprite = uiRetryIconSprite != null ? uiRetryIconSprite : FindAssetInFolders<Sprite>(packageRoots, "t:Sprite", "refresh", "retry", "arrow");
+        uiResultRibbonSprite = uiResultRibbonSprite != null ? uiResultRibbonSprite : FindAssetInFolders<Sprite>(packageRoots, "t:Sprite", "ribbon", "banner");
+        uiStarSprite = uiStarSprite != null ? uiStarSprite : FindAssetInFolders<Sprite>(packageRoots, "t:Sprite", "star");
 #endif
     }
 
