@@ -67,6 +67,7 @@ public class GameManager : MonoBehaviour
     private Text timerText;
     private GameObject levelCompleteMenu;
     private Text levelCompleteText;
+    private Text levelStarsText;
     private GameObject nextLevelButton;
     private Camera mainCamera;
     private Transform arenaRoot;
@@ -229,6 +230,15 @@ public class GameManager : MonoBehaviour
         levelCompleteText.color = new Color(1f, 0.95f, 0.2f);
         levelCompleteText.text = "level complete";
 
+        levelStarsText = CreateText(levelCompleteMenu.transform, "LevelStarsText", new Vector2(0f, 220f), new Vector2(680f, 140f), TextAnchor.MiddleCenter, 120);
+        var starsRect = levelStarsText.GetComponent<RectTransform>();
+        starsRect.anchorMin = new Vector2(0.5f, 0.5f);
+        starsRect.anchorMax = new Vector2(0.5f, 0.5f);
+        starsRect.pivot = new Vector2(0.5f, 0.5f);
+        starsRect.anchoredPosition = new Vector2(0f, 230f);
+        levelStarsText.color = new Color(1f, 0.86f, 0.22f, 1f);
+        levelStarsText.text = string.Empty;
+
         nextLevelButton = CreateMenuButton(levelCompleteMenu.transform, "NextLevelButton", "next level", new Vector2(0f, 10f), HandleNextLevelPressed);
         CreateMenuButton(levelCompleteMenu.transform, "RetryButton", "retry", new Vector2(0f, -120f), HandleRetryPressed);
         levelCompleteMenu.SetActive(false);
@@ -288,6 +298,7 @@ public class GameManager : MonoBehaviour
         {
             levelFinished = true;
             ShowResultMenu($"level {currentLevelIndex + 1} complete", true);
+            UpdateLevelStarsVisual(GetStarsForRemainingTime());
             Time.timeScale = 0f;
         }
     }
@@ -637,15 +648,24 @@ public class GameManager : MonoBehaviour
         borderRenderer.sortingOrder = 1;
 
         var spikeRoots = new List<Transform>();
-        const int spikeColumns = 3;
-        const int spikeRows = 3;
+        const int spikeColumns = 4;
+        const int spikeRows = 4;
+        const float spikePaddingX = 0.15f;
+        const float spikePaddingY = 0.15f;
+        const float loweredSpikeOffset = -0.16f;
+        var minX = -0.5f + spikePaddingX;
+        var maxX = 0.5f - spikePaddingX;
+        var minY = -0.5f + spikePaddingY + loweredSpikeOffset;
+        var maxY = 0.5f - spikePaddingY + loweredSpikeOffset;
         for (var y = 0; y < spikeRows; y++)
         {
             for (var x = 0; x < spikeColumns; x++)
             {
                 var spike = new GameObject($"Spike_{x}_{y}", typeof(SpriteRenderer));
                 spike.transform.SetParent(platform.transform, false);
-                spike.transform.localPosition = new Vector3(-0.3f + x * 0.3f, -0.16f, 0f);
+                var xPosition = spikeColumns == 1 ? 0f : Mathf.Lerp(minX, maxX, (float)x / (spikeColumns - 1));
+                var yPosition = spikeRows == 1 ? loweredSpikeOffset : Mathf.Lerp(minY, maxY, (float)y / (spikeRows - 1));
+                spike.transform.localPosition = new Vector3(xPosition, yPosition, 0f);
                 spike.transform.localScale = new Vector3(0.3f, 0.34f, 1f);
                 var spikeRenderer = spike.GetComponent<SpriteRenderer>();
                 spikeRenderer.sprite = RuntimeSpriteFactory.SpikeSprite;
@@ -1086,6 +1106,11 @@ public class GameManager : MonoBehaviour
         }
 
         levelCompleteText.text = resultText;
+        if (levelStarsText != null && !showNextLevelButton)
+        {
+            levelStarsText.text = string.Empty;
+        }
+
         if (nextLevelButton != null)
         {
             nextLevelButton.SetActive(showNextLevelButton);
@@ -1142,6 +1167,33 @@ public class GameManager : MonoBehaviour
             timerText.transform.localScale = Vector3.one;
             timerText.color = new Color(1f, 0.95f, 0.2f);
         }
+    }
+
+    private int GetStarsForRemainingTime()
+    {
+        var seconds = Mathf.FloorToInt(remainingLevelTime);
+        if (seconds >= 30)
+        {
+            return 3;
+        }
+
+        if (seconds >= 20)
+        {
+            return 2;
+        }
+
+        return 1;
+    }
+
+    private void UpdateLevelStarsVisual(int starsCount)
+    {
+        if (levelStarsText == null)
+        {
+            return;
+        }
+
+        starsCount = Mathf.Clamp(starsCount, 1, 3);
+        levelStarsText.text = new string('★', starsCount);
     }
 
     private void SpawnSnakeDeathJuice(Vector3 deathPosition)
