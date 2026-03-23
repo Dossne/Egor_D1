@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
+using UnityEngine.Serialization;
 
 public class GameManager : MonoBehaviour
 {
@@ -15,14 +16,18 @@ public class GameManager : MonoBehaviour
     [Header("Game Rules")]
     [SerializeField] private int startSnakeLength = 5;
     [SerializeField] private int growthPerBerry = 3;
+    [FormerlySerializedAs("snakeSpeed")]
     [SerializeField] private float snakeSpeed = 2.625f;
+    [SerializeField] private float snakeSpeedFactor = 0.75f;
     [SerializeField] private List<LevelConfig> levels = new();
 
     [Header("Arena")]
-    [SerializeField] private Vector2 arenaSize = new(8f, 12f);
+    [SerializeField] private Vector2 baseArenaSize = new(8f, 12f);
+    [SerializeField] private Vector2 nextLevelSizeMultiplierRange = new(1.5f, 2f);
     [SerializeField] private float wallThickness = 0.4f;
     [SerializeField] private float cameraHeightFactor = 0.4f;
     [SerializeField] private float minimumCameraSize = 4.5f;
+    [SerializeField] private float cameraZoomOutFactor = 1.2f;
     [SerializeField] private Vector3 cameraOffset = new(0f, 0f, -10f);
 
     private readonly List<Berry> activeBerries = new();
@@ -34,6 +39,9 @@ public class GameManager : MonoBehaviour
     private GameObject levelCompleteMenu;
     private Text levelCompleteText;
     private Camera mainCamera;
+    private Transform arenaRoot;
+    private readonly List<float> levelArenaScales = new();
+    private Vector2 currentArenaSize;
     private int currentLevelIndex;
     private bool levelFinished;
 
@@ -43,8 +51,8 @@ public class GameManager : MonoBehaviour
         SetupPortraitOrientation();
         SetupCamera();
         SetupUi();
-        BuildArena();
         EnsureLevelsConfigured();
+        BuildArena();
         CreateSnake();
         SpawnCurrentLevelBerries();
         UpdateLevelText();
@@ -79,7 +87,7 @@ public class GameManager : MonoBehaviour
         }
 
         mainCamera.orthographic = true;
-        mainCamera.orthographicSize = Mathf.Max(arenaSize.y * cameraHeightFactor, minimumCameraSize);
+        mainCamera.orthographicSize = Mathf.Max(baseArenaSize.y * cameraHeightFactor, minimumCameraSize) * cameraZoomOutFactor;
         mainCamera.transform.position = cameraOffset;
         mainCamera.backgroundColor = new Color(0.08f, 0.08f, 0.11f);
     }
@@ -169,21 +177,30 @@ public class GameManager : MonoBehaviour
 
     private void BuildArena()
     {
-        CreateArenaBackground();
-        var topPosition = new Vector2(0f, arenaSize.y * 0.5f + wallThickness * 0.5f);
-        var bottomPosition = new Vector2(0f, -arenaSize.y * 0.5f - wallThickness * 0.5f);
-        var leftPosition = new Vector2(-arenaSize.x * 0.5f - wallThickness * 0.5f, 0f);
-        var rightPosition = new Vector2(arenaSize.x * 0.5f + wallThickness * 0.5f, 0f);
+        if (arenaRoot != null)
+        {
+            Destroy(arenaRoot.gameObject);
+        }
 
-        CreateWall("TopWall", topPosition, new Vector2(arenaSize.x + wallThickness * 2f, wallThickness));
-        CreateWall("BottomWall", bottomPosition, new Vector2(arenaSize.x + wallThickness * 2f, wallThickness));
-        CreateWall("LeftWall", leftPosition, new Vector2(wallThickness, arenaSize.y));
-        CreateWall("RightWall", rightPosition, new Vector2(wallThickness, arenaSize.y));
+        arenaRoot = new GameObject("ArenaRoot").transform;
+        currentArenaSize = GetArenaSizeForLevel(currentLevelIndex);
+
+        CreateArenaBackground();
+        var topPosition = new Vector2(0f, currentArenaSize.y * 0.5f + wallThickness * 0.5f);
+        var bottomPosition = new Vector2(0f, -currentArenaSize.y * 0.5f - wallThickness * 0.5f);
+        var leftPosition = new Vector2(-currentArenaSize.x * 0.5f - wallThickness * 0.5f, 0f);
+        var rightPosition = new Vector2(currentArenaSize.x * 0.5f + wallThickness * 0.5f, 0f);
+
+        CreateWall("TopWall", topPosition, new Vector2(currentArenaSize.x + wallThickness * 2f, wallThickness));
+        CreateWall("BottomWall", bottomPosition, new Vector2(currentArenaSize.x + wallThickness * 2f, wallThickness));
+        CreateWall("LeftWall", leftPosition, new Vector2(wallThickness, currentArenaSize.y));
+        CreateWall("RightWall", rightPosition, new Vector2(wallThickness, currentArenaSize.y));
 
         CreateLaserCorner("TopLeftCorner", new Vector2(leftPosition.x, topPosition.y));
         CreateLaserCorner("TopRightCorner", new Vector2(rightPosition.x, topPosition.y));
         CreateLaserCorner("BottomLeftCorner", new Vector2(leftPosition.x, bottomPosition.y));
         CreateLaserCorner("BottomRightCorner", new Vector2(rightPosition.x, bottomPosition.y));
+        ApplyCameraSizeForCurrentArena();
     }
 
     private void CreateSnake()
@@ -192,7 +209,7 @@ public class GameManager : MonoBehaviour
         snakeObject.transform.position = Vector3.zero;
 
         snakeController = snakeObject.GetComponent<SnakeController>();
-        snakeController.Setup(this, joystickInput, startSnakeLength, snakeSpeed);
+        snakeController.Setup(this, joystickInput, startSnakeLength, snakeSpeed * snakeSpeedFactor);
     }
 
     public void HandleBerryCollected(Berry berry)
@@ -211,6 +228,7 @@ public class GameManager : MonoBehaviour
         {
             levelFinished = true;
             levelCompleteMenu.SetActive(true);
+            levelCompleteText.text = $"level {currentLevelIndex + 1} complete";
             Time.timeScale = 0f;
         }
     }
@@ -277,6 +295,7 @@ public class GameManager : MonoBehaviour
         }
 
         CreateSnake();
+        BuildArena();
         SpawnCurrentLevelBerries();
         UpdateLevelText();
     }
@@ -289,10 +308,11 @@ public class GameManager : MonoBehaviour
         }
 
         var level = levels[Mathf.Clamp(currentLevelIndex, 0, levels.Count - 1)];
+        var levelScale = GetArenaScaleForLevel(currentLevelIndex);
         for (var i = 0; i < level.berryPositions.Count; i++)
         {
             var berryObject = new GameObject($"Berry_{i + 1}", typeof(SpriteRenderer), typeof(CircleCollider2D), typeof(Berry));
-            berryObject.transform.position = level.berryPositions[i];
+            berryObject.transform.position = level.berryPositions[i] * levelScale;
 
             var berry = berryObject.GetComponent<Berry>();
             berry.Setup(this, growthPerBerry);
@@ -304,6 +324,7 @@ public class GameManager : MonoBehaviour
     {
         if (levels.Count > 0)
         {
+            EnsureLevelArenaScales();
             return;
         }
 
@@ -313,6 +334,8 @@ public class GameManager : MonoBehaviour
             new() { berryPositions = new List<Vector2> { new(-2.2f, 2.8f), new(2.2f, 2.2f), new(0f, -1.9f), new(1.5f, -3.4f) } },
             new() { berryPositions = new List<Vector2> { new(-2.7f, 0.5f), new(-0.2f, 3f), new(2.5f, 0.8f), new(-1.4f, -2.9f), new(1.6f, -3.2f) } }
         };
+
+        EnsureLevelArenaScales();
     }
 
     private void HandleNextLevelPressed()
@@ -323,7 +346,7 @@ public class GameManager : MonoBehaviour
         }
 
         currentLevelIndex = (currentLevelIndex + 1) % levels.Count;
-        RestartCurrentLevel(clearSplashes: false);
+        RestartCurrentLevel(clearSplashes: true);
     }
 
     private void HandleRetryPressed()
@@ -339,10 +362,11 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    private static void CreateWall(string name, Vector2 position, Vector2 size)
+    private void CreateWall(string name, Vector2 position, Vector2 size)
     {
         var isVerticalWall = size.y > size.x;
         var wall = new GameObject(name, typeof(SpriteRenderer), typeof(BoxCollider2D), typeof(WallCollision));
+        wall.transform.SetParent(arenaRoot, true);
         wall.transform.position = position;
         wall.transform.localScale = isVerticalWall
             ? new Vector3(size.y, size.x, 1f)
@@ -411,9 +435,10 @@ public class GameManager : MonoBehaviour
         activeJuiceDroplets.Clear();
     }
 
-    private static void CreateLaserCorner(string name, Vector2 position)
+    private void CreateLaserCorner(string name, Vector2 position)
     {
         var corner = new GameObject(name, typeof(SpriteRenderer));
+        corner.transform.SetParent(arenaRoot, true);
         corner.transform.position = position;
         corner.transform.localScale = new Vector3(0.5f, 0.5f, 1f);
 
@@ -435,13 +460,58 @@ public class GameManager : MonoBehaviour
     private void CreateArenaBackground()
     {
         var background = new GameObject("ArenaBackground", typeof(SpriteRenderer));
+        background.transform.SetParent(arenaRoot, true);
         background.transform.position = Vector3.zero;
-        background.transform.localScale = new Vector3(arenaSize.x, arenaSize.y, 1f);
+        background.transform.localScale = new Vector3(currentArenaSize.x, currentArenaSize.y, 1f);
 
         var renderer = background.GetComponent<SpriteRenderer>();
         renderer.sprite = RuntimeSpriteFactory.WhiteSprite;
         renderer.color = new Color(0.11f, 0.16f, 0.13f, 1f);
         renderer.sortingOrder = -1;
+    }
+
+    private float GetArenaScaleForLevel(int levelIndex)
+    {
+        EnsureLevelArenaScales();
+        return levelArenaScales[Mathf.Clamp(levelIndex, 0, levelArenaScales.Count - 1)];
+    }
+
+    private Vector2 GetArenaSizeForLevel(int levelIndex)
+    {
+        return baseArenaSize * GetArenaScaleForLevel(levelIndex);
+    }
+
+    private void ApplyCameraSizeForCurrentArena()
+    {
+        if (mainCamera == null)
+        {
+            return;
+        }
+
+        mainCamera.orthographicSize = Mathf.Max(currentArenaSize.y * cameraHeightFactor, minimumCameraSize) * cameraZoomOutFactor;
+    }
+
+    private void EnsureLevelArenaScales()
+    {
+        if (levels.Count == 0)
+        {
+            return;
+        }
+
+        if (levelArenaScales.Count == levels.Count)
+        {
+            return;
+        }
+
+        levelArenaScales.Clear();
+        levelArenaScales.Add(1f);
+
+        var minScale = Mathf.Min(nextLevelSizeMultiplierRange.x, nextLevelSizeMultiplierRange.y);
+        var maxScale = Mathf.Max(nextLevelSizeMultiplierRange.x, nextLevelSizeMultiplierRange.y);
+        for (var i = 1; i < levels.Count; i++)
+        {
+            levelArenaScales.Add(Random.Range(minScale, maxScale));
+        }
     }
 
     private static Text CreateText(Transform parent, string objectName, Vector2 anchoredPosition, Vector2 size, TextAnchor alignment, int fontSize)
