@@ -109,7 +109,7 @@ public class SnakeController : MonoBehaviour
         ApplyHeadSprite(true);
     }
 
-    public void Kill()
+    public void Kill(bool spawnExplosion)
     {
         if (!isAlive)
         {
@@ -117,7 +117,7 @@ public class SnakeController : MonoBehaviour
         }
 
         isAlive = false;
-        gameManager.HandleLose();
+        gameManager.HandleLose(transform.position, spawnExplosion);
     }
 
     private void OnTriggerEnter2D(Collider2D other)
@@ -127,9 +127,10 @@ public class SnakeController : MonoBehaviour
             return;
         }
 
-        if (other.GetComponent<WallCollision>() != null)
+        var wallCollision = other.GetComponent<WallCollision>();
+        if (wallCollision != null)
         {
-            Kill();
+            Kill(wallCollision.ShouldSpawnExplosion);
             return;
         }
 
@@ -140,7 +141,7 @@ public class SnakeController : MonoBehaviour
             {
                 if (other.transform == segments[i])
                 {
-                    Kill();
+                    Kill(false);
                     return;
                 }
             }

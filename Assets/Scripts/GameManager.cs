@@ -43,9 +43,7 @@ public class GameManager : MonoBehaviour
     [SerializeField] private Vector2 baseArenaSize = new(8f, 12f);
     [SerializeField] private Vector2 nextLevelSizeMultiplierRange = new(1.5f, 2f);
     [SerializeField] private float wallThickness = 0.4f;
-    [SerializeField] private float cameraHeightFactor = 0.4f;
-    [SerializeField] private float minimumCameraSize = 4.5f;
-    [SerializeField] private float cameraZoomOutFactor = 1.35f;
+    [SerializeField] private float fixedCameraSize = 6.4f;
     [SerializeField] private Vector3 cameraOffset = new(0f, 0f, -10f);
 
     private readonly List<Berry> activeBerries = new();
@@ -56,6 +54,7 @@ public class GameManager : MonoBehaviour
     private Text levelText;
     private GameObject levelCompleteMenu;
     private Text levelCompleteText;
+    private GameObject nextLevelButton;
     private Camera mainCamera;
     private Transform arenaRoot;
     private readonly List<float> levelArenaScales = new();
@@ -106,7 +105,7 @@ public class GameManager : MonoBehaviour
         }
 
         mainCamera.orthographic = true;
-        mainCamera.orthographicSize = Mathf.Max(baseArenaSize.y * cameraHeightFactor, minimumCameraSize) * cameraZoomOutFactor;
+        mainCamera.orthographicSize = fixedCameraSize;
         mainCamera.transform.position = cameraOffset;
         mainCamera.backgroundColor = new Color(0.08f, 0.08f, 0.11f);
     }
@@ -189,7 +188,7 @@ public class GameManager : MonoBehaviour
         levelCompleteText.color = new Color(1f, 0.95f, 0.2f);
         levelCompleteText.text = "level complete";
 
-        CreateMenuButton(levelCompleteMenu.transform, "NextLevelButton", "next level", new Vector2(0f, 10f), HandleNextLevelPressed);
+        nextLevelButton = CreateMenuButton(levelCompleteMenu.transform, "NextLevelButton", "next level", new Vector2(0f, 10f), HandleNextLevelPressed);
         CreateMenuButton(levelCompleteMenu.transform, "RetryButton", "retry", new Vector2(0f, -120f), HandleRetryPressed);
         levelCompleteMenu.SetActive(false);
     }
@@ -247,8 +246,7 @@ public class GameManager : MonoBehaviour
         if (activeBerries.Count == 0)
         {
             levelFinished = true;
-            levelCompleteMenu.SetActive(true);
-            levelCompleteText.text = $"level {currentLevelIndex + 1} complete";
+            ShowResultMenu($"level {currentLevelIndex + 1} complete", true);
             Time.timeScale = 0f;
         }
     }
@@ -276,14 +274,27 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    public void HandleLose()
+    public void HandleLose(Vector3 deathPosition, bool spawnExplosion)
     {
         if (levelFinished)
         {
             return;
         }
 
-        RestartCurrentLevel(clearSplashes: true);
+        levelFinished = true;
+        if (snakeController != null)
+        {
+            snakeController.gameObject.SetActive(false);
+        }
+
+        SpawnSnakeDeathJuice(deathPosition);
+        if (spawnExplosion)
+        {
+            SpawnMineExplosion(deathPosition);
+        }
+
+        ShowResultMenu("You died", false);
+        Time.timeScale = 0f;
     }
 
     private void RestartCurrentLevel(bool clearSplashes)
@@ -435,6 +446,9 @@ public class GameManager : MonoBehaviour
         var collider = wall.GetComponent<BoxCollider2D>();
         collider.isTrigger = true;
         collider.size = Vector2.one;
+
+        var wallCollision = wall.GetComponent<WallCollision>();
+        wallCollision.SetType(WallCollision.HazardType.Laser);
     }
 
     private IEnumerator AnimateJuiceDroplet(GameObject droplet, Vector3 startPosition, Vector2 offset, float duration)
@@ -486,30 +500,56 @@ public class GameManager : MonoBehaviour
             var obstacle = level.obstacles[i];
             if (obstacle.type == ObstacleType.Pillar)
             {
-                CreatePillarObstacle($"Pillar_{i + 1}", obstacle.position * levelScale, obstacle.radius);
+                CreateMineObstacle($"Mine_{i + 1}", obstacle.position * levelScale, obstacle.radius);
             }
         }
     }
 
-    private void CreatePillarObstacle(string name, Vector2 position, float radius)
+    private void CreateMineObstacle(string name, Vector2 position, float radius)
     {
-        var pillar = new GameObject(name, typeof(SpriteRenderer), typeof(CircleCollider2D), typeof(WallCollision));
-        pillar.transform.SetParent(arenaRoot, true);
-        pillar.transform.position = position;
+        var mine = new GameObject(name, typeof(SpriteRenderer), typeof(CircleCollider2D), typeof(WallCollision));
+        mine.transform.SetParent(arenaRoot, true);
+        mine.transform.position = position;
         var diameter = radius * 2f;
-        pillar.transform.localScale = new Vector3(diameter, diameter, 1f);
+        mine.transform.localScale = new Vector3(diameter, diameter, 1f);
 
-        var renderer = pillar.GetComponent<SpriteRenderer>();
-        renderer.sprite = RuntimeSpriteFactory.CircleSprite;
+        var renderer = mine.GetComponent<SpriteRenderer>();
+        renderer.sprite = RuntimeSpriteFactory.MineBodySprite;
         renderer.color = Color.white;
         renderer.sortingOrder = 3;
 
-        var collider = pillar.GetComponent<CircleCollider2D>();
+        var collider = mine.GetComponent<CircleCollider2D>();
         collider.isTrigger = true;
         collider.radius = 0.5f;
 
+        var wallCollision = mine.GetComponent<WallCollision>();
+        wallCollision.SetType(WallCollision.HazardType.Mine);
+
+        var center = new GameObject("Center", typeof(SpriteRenderer));
+        center.transform.SetParent(mine.transform, false);
+        center.transform.localScale = new Vector3(0.42f, 0.42f, 1f);
+        var centerRenderer = center.GetComponent<SpriteRenderer>();
+        centerRenderer.sprite = RuntimeSpriteFactory.CircleSprite;
+        centerRenderer.color = new Color(1f, 0.25f, 0.2f, 1f);
+        centerRenderer.sortingOrder = 5;
+
+        for (var i = 0; i < 8; i++)
+        {
+            var spike = new GameObject($"Spike_{i + 1}", typeof(SpriteRenderer));
+            spike.transform.SetParent(mine.transform, false);
+            var angle = i * 45f;
+            spike.transform.localRotation = Quaternion.Euler(0f, 0f, angle);
+            spike.transform.localPosition = Quaternion.Euler(0f, 0f, angle) * (Vector3.right * 0.72f);
+            spike.transform.localScale = new Vector3(0.44f, 0.12f, 1f);
+
+            var spikeRenderer = spike.GetComponent<SpriteRenderer>();
+            spikeRenderer.sprite = RuntimeSpriteFactory.WallSprite;
+            spikeRenderer.color = new Color(0.95f, 0.18f, 0.14f, 1f);
+            spikeRenderer.sortingOrder = 4;
+        }
+
         var glow = new GameObject("Glow", typeof(SpriteRenderer));
-        glow.transform.SetParent(pillar.transform, false);
+        glow.transform.SetParent(mine.transform, false);
         glow.transform.localScale = new Vector3(1.6f, 1.6f, 1f);
         var glowRenderer = glow.GetComponent<SpriteRenderer>();
         glowRenderer.sprite = RuntimeSpriteFactory.CircleSprite;
@@ -685,7 +725,7 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        mainCamera.orthographicSize = Mathf.Max(currentArenaSize.y * cameraHeightFactor, minimumCameraSize) * cameraZoomOutFactor;
+        mainCamera.orthographicSize = fixedCameraSize;
     }
 
     private void EnsureLevelArenaScales()
@@ -728,7 +768,72 @@ public class GameManager : MonoBehaviour
         return text;
     }
 
-    private static void CreateMenuButton(Transform parent, string name, string label, Vector2 anchoredPosition, UnityEngine.Events.UnityAction callback)
+    private void ShowResultMenu(string resultText, bool showNextLevelButton)
+    {
+        if (levelCompleteMenu == null || levelCompleteText == null)
+        {
+            return;
+        }
+
+        levelCompleteText.text = resultText;
+        if (nextLevelButton != null)
+        {
+            nextLevelButton.SetActive(showNextLevelButton);
+        }
+
+        levelCompleteMenu.SetActive(true);
+    }
+
+    private void SpawnSnakeDeathJuice(Vector3 deathPosition)
+    {
+        SpawnBerryJuiceSplash(deathPosition);
+        if (snakeController == null)
+        {
+            return;
+        }
+
+        var body = snakeController.GetComponent<SnakeBody>();
+        if (body == null)
+        {
+            return;
+        }
+
+        var segments = body.Segments;
+        for (var i = 0; i < segments.Count; i++)
+        {
+            if (segments[i] != null)
+            {
+                SpawnBerryJuiceSplash(segments[i].position);
+            }
+        }
+
+        body.ClearSegments();
+    }
+
+    private void SpawnMineExplosion(Vector3 center)
+    {
+        const int flashCount = 10;
+        for (var i = 0; i < flashCount; i++)
+        {
+            var flash = new GameObject($"ExplosionFlash_{i + 1}", typeof(SpriteRenderer));
+            flash.transform.position = center;
+            flash.transform.localScale = Vector3.one * Random.Range(0.2f, 0.4f);
+
+            var flashRenderer = flash.GetComponent<SpriteRenderer>();
+            flashRenderer.sprite = RuntimeSpriteFactory.CircleSprite;
+            flashRenderer.color = new Color(1f, 0.55f, 0.15f, 0.8f);
+            flashRenderer.sortingOrder = 6;
+            activeJuiceDroplets.Add(flash);
+
+            var angle = Random.Range(0f, Mathf.PI * 2f);
+            var direction = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
+            var distance = Random.Range(0.6f, 1.4f);
+            var duration = Random.Range(0.08f, 0.16f);
+            StartCoroutine(AnimateJuiceDroplet(flash, center, direction * distance, duration));
+        }
+    }
+
+    private static GameObject CreateMenuButton(Transform parent, string name, string label, Vector2 anchoredPosition, UnityEngine.Events.UnityAction callback)
     {
         var buttonObject = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
         buttonObject.transform.SetParent(parent, false);
@@ -754,6 +859,7 @@ public class GameManager : MonoBehaviour
         textRect.anchoredPosition = Vector2.zero;
         text.color = Color.white;
         text.text = label;
+        return buttonObject;
     }
 
 }
