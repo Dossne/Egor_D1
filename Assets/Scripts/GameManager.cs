@@ -1,0 +1,258 @@
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
+
+public class GameManager : MonoBehaviour
+{
+    [Header("Game Rules")]
+    [SerializeField] private int startSnakeLength = 5;
+    [SerializeField] private int berryCount = 3;
+    [SerializeField] private int growthPerBerry = 3;
+    [SerializeField] private float snakeSpeed = 3.5f;
+
+    [Header("Arena")]
+    [SerializeField] private Vector2 arenaSize = new(8f, 12f);
+    [SerializeField] private float wallThickness = 0.4f;
+
+    private readonly List<Vector2> initialBerryPositions = new();
+    private readonly List<Berry> activeBerries = new();
+
+    private SnakeController snakeController;
+    private JoystickInput joystickInput;
+    private Text winText;
+    private bool levelFinished;
+
+    private void Awake()
+    {
+        SetupPortraitOrientation();
+        SetupCamera();
+        SetupUi();
+        BuildArena();
+        CreateSnake();
+        CreateOrRestoreBerries(useStoredPositions: false);
+    }
+
+    private void SetupPortraitOrientation()
+    {
+        Screen.orientation = ScreenOrientation.Portrait;
+        Screen.autorotateToPortrait = true;
+        Screen.autorotateToPortraitUpsideDown = false;
+        Screen.autorotateToLandscapeLeft = false;
+        Screen.autorotateToLandscapeRight = false;
+    }
+
+    private void SetupCamera()
+    {
+        var cam = Camera.main;
+        if (cam == null)
+        {
+            return;
+        }
+
+        cam.orthographic = true;
+        cam.orthographicSize = Mathf.Max(arenaSize.y * 0.55f, 6.5f);
+        cam.transform.position = new Vector3(0f, 0f, -10f);
+        cam.backgroundColor = new Color(0.08f, 0.08f, 0.11f);
+    }
+
+    private void SetupUi()
+    {
+        var canvasObject = new GameObject("UI", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+        var canvas = canvasObject.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+
+        var scaler = canvasObject.GetComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1080, 1920);
+
+        if (FindObjectOfType<EventSystem>() == null)
+        {
+            new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
+        }
+
+        var joystickRoot = new GameObject("Joystick", typeof(RectTransform), typeof(Image), typeof(JoystickInput));
+        joystickRoot.transform.SetParent(canvasObject.transform, false);
+        var joystickRect = joystickRoot.GetComponent<RectTransform>();
+        joystickRect.anchorMin = new Vector2(0f, 0f);
+        joystickRect.anchorMax = new Vector2(0f, 0f);
+        joystickRect.pivot = new Vector2(0.5f, 0.5f);
+        joystickRect.anchoredPosition = new Vector2(180f, 180f);
+        joystickRect.sizeDelta = new Vector2(220f, 220f);
+
+        var joystickBg = joystickRoot.GetComponent<Image>();
+        joystickBg.color = new Color(1f, 1f, 1f, 0.18f);
+        joystickBg.sprite = RuntimeSpriteFactory.WhiteSprite;
+        joystickBg.raycastTarget = true;
+
+        var handleObject = new GameObject("Handle", typeof(RectTransform), typeof(Image));
+        handleObject.transform.SetParent(joystickRoot.transform, false);
+        var handleRect = handleObject.GetComponent<RectTransform>();
+        handleRect.sizeDelta = new Vector2(90f, 90f);
+        var handleImage = handleObject.GetComponent<Image>();
+        handleImage.sprite = RuntimeSpriteFactory.WhiteSprite;
+        handleImage.color = new Color(1f, 1f, 1f, 0.55f);
+
+        joystickInput = joystickRoot.GetComponent<JoystickInput>();
+        joystickInput.SetReferences(joystickRect, handleRect);
+
+        var winObject = new GameObject("WinText", typeof(RectTransform), typeof(Text));
+        winObject.transform.SetParent(canvasObject.transform, false);
+        var winRect = winObject.GetComponent<RectTransform>();
+        winRect.anchorMin = new Vector2(0.5f, 0.5f);
+        winRect.anchorMax = new Vector2(0.5f, 0.5f);
+        winRect.anchoredPosition = new Vector2(0f, 280f);
+        winRect.sizeDelta = new Vector2(600f, 180f);
+
+        winText = winObject.GetComponent<Text>();
+        winText.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+        winText.fontSize = 84;
+        winText.alignment = TextAnchor.MiddleCenter;
+        winText.color = new Color(1f, 0.95f, 0.2f);
+        winText.text = string.Empty;
+    }
+
+    private void BuildArena()
+    {
+        CreateWall("TopWall", new Vector2(0f, arenaSize.y * 0.5f + wallThickness * 0.5f), new Vector2(arenaSize.x + wallThickness * 2f, wallThickness));
+        CreateWall("BottomWall", new Vector2(0f, -arenaSize.y * 0.5f - wallThickness * 0.5f), new Vector2(arenaSize.x + wallThickness * 2f, wallThickness));
+        CreateWall("LeftWall", new Vector2(-arenaSize.x * 0.5f - wallThickness * 0.5f, 0f), new Vector2(wallThickness, arenaSize.y));
+        CreateWall("RightWall", new Vector2(arenaSize.x * 0.5f + wallThickness * 0.5f, 0f), new Vector2(wallThickness, arenaSize.y));
+    }
+
+    private void CreateSnake()
+    {
+        var snakeObject = new GameObject("SnakeHead", typeof(SpriteRenderer), typeof(CircleCollider2D), typeof(Rigidbody2D), typeof(SnakeBody), typeof(SnakeController));
+        snakeObject.transform.position = Vector3.zero;
+
+        snakeController = snakeObject.GetComponent<SnakeController>();
+        snakeController.Setup(this, joystickInput, startSnakeLength, snakeSpeed);
+    }
+
+    public void HandleBerryCollected(Berry berry)
+    {
+        if (levelFinished)
+        {
+            return;
+        }
+
+        if (activeBerries.Remove(berry))
+        {
+            Destroy(berry.gameObject);
+        }
+
+        if (activeBerries.Count == 0)
+        {
+            levelFinished = true;
+            winText.text = "you win";
+        }
+    }
+
+    public void HandleLose()
+    {
+        if (levelFinished)
+        {
+            return;
+        }
+
+        RestartLevel();
+    }
+
+    private void RestartLevel()
+    {
+        levelFinished = false;
+        winText.text = string.Empty;
+
+        if (snakeController != null)
+        {
+            Destroy(snakeController.gameObject);
+        }
+
+        for (var i = 0; i < activeBerries.Count; i++)
+        {
+            if (activeBerries[i] != null)
+            {
+                Destroy(activeBerries[i].gameObject);
+            }
+        }
+
+        activeBerries.Clear();
+
+        CreateSnake();
+        CreateOrRestoreBerries(useStoredPositions: true);
+    }
+
+    private void CreateOrRestoreBerries(bool useStoredPositions)
+    {
+        if (!useStoredPositions)
+        {
+            initialBerryPositions.Clear();
+        }
+
+        for (var i = 0; i < berryCount; i++)
+        {
+            Vector2 spawnPosition;
+            if (useStoredPositions && i < initialBerryPositions.Count)
+            {
+                spawnPosition = initialBerryPositions[i];
+            }
+            else
+            {
+                spawnPosition = GetBerrySpawnPosition();
+                initialBerryPositions.Add(spawnPosition);
+            }
+
+            var berryObject = new GameObject($"Berry_{i + 1}", typeof(SpriteRenderer), typeof(CircleCollider2D), typeof(Berry));
+            berryObject.transform.position = spawnPosition;
+
+            var berry = berryObject.GetComponent<Berry>();
+            berry.Setup(this, growthPerBerry);
+            activeBerries.Add(berry);
+        }
+    }
+
+    private Vector2 GetBerrySpawnPosition()
+    {
+        const int maxAttempts = 50;
+        for (var attempt = 0; attempt < maxAttempts; attempt++)
+        {
+            var margin = 1f;
+            var x = Random.Range(-arenaSize.x * 0.5f + margin, arenaSize.x * 0.5f - margin);
+            var y = Random.Range(-arenaSize.y * 0.5f + margin, arenaSize.y * 0.5f - margin);
+            var position = new Vector2(x, y);
+
+            var overlapFound = false;
+            for (var i = 0; i < initialBerryPositions.Count; i++)
+            {
+                if (Vector2.Distance(initialBerryPositions[i], position) < 1.2f)
+                {
+                    overlapFound = true;
+                    break;
+                }
+            }
+
+            if (!overlapFound)
+            {
+                return position;
+            }
+        }
+
+        return Vector2.zero;
+    }
+
+    private static void CreateWall(string name, Vector2 position, Vector2 size)
+    {
+        var wall = new GameObject(name, typeof(SpriteRenderer), typeof(BoxCollider2D), typeof(WallCollision));
+        wall.transform.position = position;
+        wall.transform.localScale = new Vector3(size.x, size.y, 1f);
+
+        var renderer = wall.GetComponent<SpriteRenderer>();
+        renderer.sprite = RuntimeSpriteFactory.WhiteSprite;
+        renderer.color = new Color(0.2f, 0.95f, 1f, 0.9f);
+
+        var collider = wall.GetComponent<BoxCollider2D>();
+        collider.isTrigger = true;
+        collider.size = Vector2.one;
+    }
+
+}
