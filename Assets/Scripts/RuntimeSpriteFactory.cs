@@ -15,6 +15,7 @@ public static class RuntimeSpriteFactory
     private static Sprite spikeSprite;
     private static Sprite starSprite;
     private static Sprite ribbonBannerSprite;
+    private static Sprite roundedButtonSprite;
 
     public static Sprite WhiteSprite
     {
@@ -185,6 +186,19 @@ public static class RuntimeSpriteFactory
             }
 
             return ribbonBannerSprite;
+        }
+    }
+
+    public static Sprite RoundedButtonSprite
+    {
+        get
+        {
+            if (roundedButtonSprite == null)
+            {
+                roundedButtonSprite = CreateRoundedButtonSprite(256, 96, 36f);
+            }
+
+            return roundedButtonSprite;
         }
     }
 
@@ -459,8 +473,6 @@ public static class RuntimeSpriteFactory
         var baseColorB = new Color32(140, 214, 59, 255);
         var darkGrass = new Color32(30, 129, 40, 255);
         var lightGrass = new Color32(98, 191, 65, 255);
-        var flowerCore = new Color32(250, 235, 75, 255);
-        var flowerPetal = new Color32(246, 246, 246, 255);
 
         for (var y = 0; y < size; y++)
         {
@@ -481,30 +493,55 @@ public static class RuntimeSpriteFactory
             texture.SetPixel(x, y + 1, darkGrass);
         }
 
-        for (var i = 0; i < 95; i++)
-        {
-            var x = random.Next(6, size - 6);
-            var y = random.Next(6, size - 6);
-            PaintCircle(texture, new Vector2(x, y), 2.45f, flowerCore);
-            PaintCircle(texture, new Vector2(x - 2f, y), 2.2f, flowerPetal);
-            PaintCircle(texture, new Vector2(x + 2f, y), 2.2f, flowerPetal);
-            PaintCircle(texture, new Vector2(x, y - 2f), 2.2f, flowerPetal);
-            PaintCircle(texture, new Vector2(x, y + 2f), 2.2f, flowerPetal);
-
-            if (random.NextDouble() > 0.35d)
-            {
-                PaintCircle(texture, new Vector2(x + 2f, y + 2f), 1.6f, flowerPetal);
-            }
-
-            if (random.NextDouble() > 0.35d)
-            {
-                PaintCircle(texture, new Vector2(x - 2f, y - 2f), 1.6f, flowerPetal);
-            }
-        }
-
         texture.wrapMode = TextureWrapMode.Repeat;
         texture.Apply();
         return Sprite.Create(texture, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 32f);
+    }
+
+    private static Sprite CreateRoundedButtonSprite(int width, int height, float cornerRadius)
+    {
+        var texture = CreateTransparentTexture(width, height);
+        var center = new Vector2((width - 1) * 0.5f, (height - 1) * 0.5f);
+        var inset = 2f;
+        var innerHalfWidth = width * 0.5f - cornerRadius - inset;
+        var innerHalfHeight = height * 0.5f - cornerRadius - inset;
+        var radiusSqr = cornerRadius * cornerRadius;
+
+        for (var y = 0; y < height; y++)
+        {
+            for (var x = 0; x < width; x++)
+            {
+                var dx = Mathf.Abs(x - center.x);
+                var dy = Mathf.Abs(y - center.y);
+                var insideCore = dx <= innerHalfWidth || dy <= innerHalfHeight;
+                var cornerDx = Mathf.Max(0f, dx - innerHalfWidth);
+                var cornerDy = Mathf.Max(0f, dy - innerHalfHeight);
+                var insideCorner = cornerDx * cornerDx + cornerDy * cornerDy <= radiusSqr;
+                if (!insideCore && !insideCorner)
+                {
+                    continue;
+                }
+
+                var vertical = Mathf.InverseLerp(0f, height - 1f, y);
+                var color = Color.Lerp(new Color(0.87f, 0.12f, 0.17f, 1f), new Color(0.74f, 0.08f, 0.13f, 1f), vertical);
+                if (vertical > 0.75f)
+                {
+                    color = Color.Lerp(color, new Color(0.95f, 0.21f, 0.24f, 1f), 0.22f);
+                }
+
+                texture.SetPixel(x, y, color);
+            }
+        }
+
+        texture.Apply();
+        return Sprite.Create(
+            texture,
+            new Rect(0, 0, width, height),
+            new Vector2(0.5f, 0.5f),
+            100f,
+            0,
+            SpriteMeshType.FullRect,
+            new Vector4(cornerRadius, cornerRadius, cornerRadius, cornerRadius));
     }
 
     private static Sprite CreateSpikeSprite(int width, int height)

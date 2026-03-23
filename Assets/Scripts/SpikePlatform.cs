@@ -5,7 +5,7 @@ using UnityEngine;
 [RequireComponent(typeof(BoxCollider2D))]
 public class SpikePlatform : MonoBehaviour
 {
-    [SerializeField] private float hiddenDurationSeconds = 5f;
+    [SerializeField] private float hiddenDurationSeconds = 3f;
     [SerializeField] private float extendedDurationSeconds = 1f;
     [SerializeField] private float loweredSpikeOffset = -0.16f;
     [SerializeField] private float raisedSpikeOffset = 0.22f;
