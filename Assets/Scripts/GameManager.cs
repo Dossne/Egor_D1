@@ -71,19 +71,30 @@ public class GameManager : MonoBehaviour
             new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
         }
 
-        var joystickRoot = new GameObject("Joystick", typeof(RectTransform), typeof(Image), typeof(JoystickInput));
-        joystickRoot.transform.SetParent(canvasObject.transform, false);
+        var joystickArea = new GameObject("JoystickTouchArea", typeof(RectTransform), typeof(Image), typeof(JoystickInput));
+        joystickArea.transform.SetParent(canvasObject.transform, false);
+        var joystickAreaRect = joystickArea.GetComponent<RectTransform>();
+        joystickAreaRect.anchorMin = Vector2.zero;
+        joystickAreaRect.anchorMax = Vector2.one;
+        joystickAreaRect.offsetMin = Vector2.zero;
+        joystickAreaRect.offsetMax = Vector2.zero;
+
+        var touchAreaImage = joystickArea.GetComponent<Image>();
+        touchAreaImage.color = new Color(0f, 0f, 0f, 0f);
+        touchAreaImage.raycastTarget = true;
+
+        var joystickRoot = new GameObject("Joystick", typeof(RectTransform), typeof(Image));
+        joystickRoot.transform.SetParent(joystickArea.transform, false);
         var joystickRect = joystickRoot.GetComponent<RectTransform>();
-        joystickRect.anchorMin = new Vector2(0f, 0f);
-        joystickRect.anchorMax = new Vector2(0f, 0f);
+        joystickRect.anchorMin = new Vector2(0.5f, 0.5f);
+        joystickRect.anchorMax = new Vector2(0.5f, 0.5f);
         joystickRect.pivot = new Vector2(0.5f, 0.5f);
-        joystickRect.anchoredPosition = new Vector2(180f, 180f);
         joystickRect.sizeDelta = new Vector2(220f, 220f);
 
         var joystickBg = joystickRoot.GetComponent<Image>();
         joystickBg.color = new Color(1f, 1f, 1f, 0.18f);
         joystickBg.sprite = RuntimeSpriteFactory.WhiteSprite;
-        joystickBg.raycastTarget = true;
+        joystickBg.raycastTarget = false;
 
         var handleObject = new GameObject("Handle", typeof(RectTransform), typeof(Image));
         handleObject.transform.SetParent(joystickRoot.transform, false);
@@ -92,8 +103,9 @@ public class GameManager : MonoBehaviour
         var handleImage = handleObject.GetComponent<Image>();
         handleImage.sprite = RuntimeSpriteFactory.WhiteSprite;
         handleImage.color = new Color(1f, 1f, 1f, 0.55f);
+        handleImage.raycastTarget = false;
 
-        joystickInput = joystickRoot.GetComponent<JoystickInput>();
+        joystickInput = joystickArea.GetComponent<JoystickInput>();
         joystickInput.SetReferences(joystickRect, handleRect);
 
         var winObject = new GameObject("WinText", typeof(RectTransform), typeof(Text));
