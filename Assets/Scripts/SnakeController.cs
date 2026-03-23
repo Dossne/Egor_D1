@@ -5,7 +5,7 @@ using UnityEngine;
 public class SnakeController : MonoBehaviour
 {
     [SerializeField] private float moveSpeed = 3.5f;
-    [SerializeField] private float turnSpeedDegreesPerSecond = 180f;
+    [SerializeField] private float turnSpeedDegreesPerSecond = 270f;
     [SerializeField] private float eatAnimationDuration = 0.14f;
 
     private Rigidbody2D rb;
