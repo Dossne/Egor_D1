@@ -36,6 +36,15 @@ public class GameManager : MonoBehaviour
         public Vector2 size = new(1.22f, 1.22f);
     }
 
+    [System.Serializable]
+    private class SoundConfig
+    {
+        public AudioClip clip;
+        [Range(0f, 1f)] public float volume = 1f;
+        [Range(0.5f, 1.5f)] public float pitch = 1f;
+        public bool loop;
+    }
+
     private enum ObstacleType
     {
         Pillar = 0,
@@ -70,6 +79,11 @@ public class GameManager : MonoBehaviour
     [SerializeField] private Sprite uiRetryIconSprite;
     [SerializeField] private Sprite uiResultRibbonSprite;
     [SerializeField] private Sprite uiStarSprite;
+    [Header("Audio")]
+    [SerializeField] private SoundConfig backgroundMusicSound = new() { volume = 0.2f, loop = true };
+    [SerializeField] private SoundConfig berryEatSound = new() { volume = 0.55f };
+    [SerializeField] private SoundConfig obstacleHitSound = new() { volume = 0.75f };
+    [SerializeField] private SoundConfig buttonClickSound = new() { volume = 0.6f };
 
     private readonly List<Berry> activeBerries = new();
     private readonly List<GameObject> activeJuiceDroplets = new();
@@ -87,6 +101,8 @@ public class GameManager : MonoBehaviour
     private GameObject nextLevelButton;
     private Camera mainCamera;
     private Transform arenaRoot;
+    private AudioSource musicAudioSource;
+    private AudioSource sfxAudioSource;
     private readonly List<float> levelArenaScales = new();
     private Vector2 currentArenaSize;
     private int currentLevelIndex;
@@ -101,7 +117,6 @@ public class GameManager : MonoBehaviour
     private readonly Color titleTextColor = new(0.97f, 0.91f, 0.68f);
     private readonly Color bodyTextColor = new(0.96f, 0.93f, 0.82f);
     private readonly Color panelTintColor = new(0.12f, 0.1f, 0.22f, 0.96f);
-    private readonly Color hudBackdropColor = new(0.03f, 0.03f, 0.06f, 0.68f);
     private readonly Color buttonFallbackColor = new(0.62f, 0.14f, 0.2f, 0.98f);
     private readonly Color iconTintColor = new(1f, 0.95f, 0.78f, 1f);
 
@@ -111,6 +126,7 @@ public class GameManager : MonoBehaviour
         TryAutoAssignGuiProAssets();
         SetupPortraitOrientation();
         SetupCamera();
+        SetupAudio();
         SetupUi();
         EnsureLevelsConfigured();
         BuildArena();
@@ -226,11 +242,10 @@ public class GameManager : MonoBehaviour
         joystickInput = joystickArea.GetComponent<JoystickInput>();
         joystickInput.SetReferences(joystickRect, handleRect);
 
-        CreateHudBackdrop(canvasObject.transform, "LevelBackdrop", new Vector2(20f, -20f), new Vector2(460f, 108f), new Vector2(0f, 1f));
         levelText = CreateText(canvasObject.transform, "LevelText", new Vector2(20f, -20f), new Vector2(420f, 96f), TextAnchor.UpperLeft, 48);
         levelText.color = titleTextColor;
         levelText.text = "level 1";
-        CreateHudBackdrop(canvasObject.transform, "TimerBackdrop", new Vector2(0f, -24f), new Vector2(520f, 148f), new Vector2(0.5f, 1f));
+        ApplyLevelTextOutline(levelText);
         timerText = CreateText(canvasObject.transform, "TimerText", new Vector2(0f, -24f), new Vector2(460f, 136f), TextAnchor.UpperCenter, 86);
         var timerRect = timerText.GetComponent<RectTransform>();
         timerRect.anchorMin = new Vector2(0.5f, 1f);
@@ -379,6 +394,7 @@ public class GameManager : MonoBehaviour
 
         if (activeBerries.Remove(berry))
         {
+            PlaySound(berryEatSound);
             Destroy(berry.gameObject);
         }
 
@@ -423,6 +439,7 @@ public class GameManager : MonoBehaviour
 
         levelFinished = true;
         isResultMenuPending = true;
+        PlaySound(obstacleHitSound);
         if (snakeController != null)
         {
             snakeController.gameObject.SetActive(false);
@@ -1389,7 +1406,11 @@ public class GameManager : MonoBehaviour
             : buttonFallbackColor;
 
         var button = buttonObject.GetComponent<Button>();
-        button.onClick.AddListener(callback);
+        button.onClick.AddListener(() =>
+        {
+            PlaySound(buttonClickSound);
+            callback?.Invoke();
+        });
         button.transition = Selectable.Transition.ColorTint;
         button.targetGraphic = buttonImage;
         button.colors = new ColorBlock
@@ -1445,20 +1466,69 @@ public class GameManager : MonoBehaviour
         return iconObject;
     }
 
-    private void CreateHudBackdrop(Transform parent, string name, Vector2 anchoredPosition, Vector2 size, Vector2 anchor)
+    private void SetupAudio()
     {
-        var backdropObject = new GameObject(name, typeof(RectTransform), typeof(Image));
-        backdropObject.transform.SetParent(parent, false);
-        var backdropRect = backdropObject.GetComponent<RectTransform>();
-        backdropRect.anchorMin = anchor;
-        backdropRect.anchorMax = anchor;
-        backdropRect.pivot = new Vector2(anchor.x, 1f);
-        backdropRect.anchoredPosition = anchoredPosition;
-        backdropRect.sizeDelta = size;
+        musicAudioSource = gameObject.AddComponent<AudioSource>();
+        musicAudioSource.playOnAwake = false;
+        musicAudioSource.spatialBlend = 0f;
 
-        var backdropImage = backdropObject.GetComponent<Image>();
-        backdropImage.color = hudBackdropColor;
-        backdropImage.raycastTarget = false;
+        sfxAudioSource = gameObject.AddComponent<AudioSource>();
+        sfxAudioSource.playOnAwake = false;
+        sfxAudioSource.spatialBlend = 0f;
+
+        ApplySoundConfig(musicAudioSource, backgroundMusicSound);
+        if (backgroundMusicSound.clip != null)
+        {
+            musicAudioSource.Play();
+        }
+    }
+
+    private void ApplyLevelTextOutline(Text text)
+    {
+        if (text == null)
+        {
+            return;
+        }
+
+        var shadow = text.GetComponent<Shadow>();
+        if (shadow != null)
+        {
+            shadow.enabled = false;
+        }
+
+        var outline = text.GetComponent<Outline>();
+        if (outline == null)
+        {
+            outline = text.gameObject.AddComponent<Outline>();
+        }
+
+        outline.effectColor = new Color(0.06f, 0.05f, 0.1f, 0.9f);
+        outline.effectDistance = new Vector2(2f, -2f);
+        outline.useGraphicAlpha = true;
+    }
+
+    private void ApplySoundConfig(AudioSource source, SoundConfig config)
+    {
+        if (source == null || config == null)
+        {
+            return;
+        }
+
+        source.clip = config.clip;
+        source.volume = config.volume;
+        source.pitch = config.pitch;
+        source.loop = config.loop;
+    }
+
+    private void PlaySound(SoundConfig config)
+    {
+        if (sfxAudioSource == null || config == null || config.clip == null)
+        {
+            return;
+        }
+
+        sfxAudioSource.pitch = config.pitch;
+        sfxAudioSource.PlayOneShot(config.clip, config.volume);
     }
 
     private void TryAutoAssignGuiProAssets()
