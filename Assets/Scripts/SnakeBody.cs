@@ -91,7 +91,7 @@ public class SnakeBody : MonoBehaviour
         segment.transform.position = position;
 
         var renderer = segment.AddComponent<SpriteRenderer>();
-        renderer.sprite = RuntimeSpriteFactory.WhiteSprite;
+        renderer.sprite = RuntimeSpriteFactory.CircleSprite;
         renderer.color = new Color(0.82f, 0.12f, 0.17f);
         renderer.sortingOrder = 3;
         segment.transform.localScale = new Vector3(0.5f, 0.5f, 1f);
