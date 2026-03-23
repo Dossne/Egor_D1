@@ -32,10 +32,10 @@ public class SnakeController : MonoBehaviour
         collider.isTrigger = true;
 
         var renderer = GetComponent<SpriteRenderer>();
-        renderer.sprite = RuntimeSpriteFactory.CircleSprite;
-        renderer.color = new Color(0.92f, 0.1f, 0.15f);
+        renderer.sprite = RuntimeSpriteFactory.SnakeHeadSprite;
+        renderer.color = Color.white;
         renderer.sortingOrder = 4;
-        transform.localScale = new Vector3(0.62f, 0.62f, 1f);
+        transform.localScale = new Vector3(0.68f, 0.68f, 1f);
 
         snakeBody = GetComponent<SnakeBody>();
         snakeBody.Initialize(transform, Mathf.Max(0, startLength - 1), transform.parent);

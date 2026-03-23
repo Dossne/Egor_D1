@@ -11,6 +11,7 @@ public class JoystickInput : MonoBehaviour, IPointerDownHandler, IDragHandler, I
     private RectTransform touchArea;
     private Canvas canvas;
     private Camera uiCamera;
+    private bool pointerActive;
 
     public Vector2 InputVector { get; private set; }
 
@@ -44,13 +45,14 @@ public class JoystickInput : MonoBehaviour, IPointerDownHandler, IDragHandler, I
             background.anchoredPosition = localPoint;
         }
 
+        pointerActive = true;
         SetBackgroundVisible(true);
         OnDrag(eventData);
     }
 
     public void OnDrag(PointerEventData eventData)
     {
-        if (background == null || handle == null)
+        if (background == null || handle == null || !pointerActive)
         {
             return;
         }
@@ -66,13 +68,27 @@ public class JoystickInput : MonoBehaviour, IPointerDownHandler, IDragHandler, I
         }
 
         var radius = background.sizeDelta.x * 0.5f;
-        var normalized = localPoint / radius;
+        var localPointMagnitude = localPoint.magnitude;
+        if (localPointMagnitude > radius && touchArea != null)
+        {
+            var overDistance = localPointMagnitude - radius;
+            var moveOffset = localPoint.normalized * overDistance;
+            background.anchoredPosition += moveOffset;
+
+            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(background, eventData.position, uiCamera, out localPoint))
+            {
+                return;
+            }
+        }
+
+        var normalized = radius > 0f ? localPoint / radius : Vector2.zero;
         InputVector = Vector2.ClampMagnitude(normalized, 1f);
         handle.anchoredPosition = InputVector * handleRange;
     }
 
     public void OnPointerUp(PointerEventData eventData)
     {
+        pointerActive = false;
         InputVector = Vector2.zero;
         if (handle != null)
         {
